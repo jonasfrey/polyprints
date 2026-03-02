@@ -8,7 +8,7 @@ import { f_s_name_table__from_o_model, o_model__o_fsnode, o_model__o_utterance }
 import { f_v_crud__indb } from './database_functions.js';
 
 let f_init_python = async function(){
-    let a_s_package = ['python-dotenv', 'pyttsx3'];
+    let a_s_package = ['python-dotenv', 'pyttsx3', 'trimesh', 'numpy'];
 
     // check if venv exists
     let b_venv_exists = true;
@@ -190,8 +190,31 @@ let f_install_linux_binary = async function(s_name_binary){
 }
 
 
+let f_convert_glb_to_stl = async function(s_path_glb) {
+    let s_path_stl = s_path_glb.replace(/\.glb$/, '.stl');
+    let s_path__python = `${s_path__venv}${s_ds}bin${s_ds}python3`;
+    try { await Deno.stat(s_path__python); } catch { s_path__python = s_bin__python; }
+
+    let s_script = `import trimesh; m = trimesh.load("${s_path_glb.replace(/\\/g, '\\\\')}", force="mesh"); m.export("${s_path_stl.replace(/\\/g, '\\\\')}")`;
+    let o_process = new Deno.Command(s_path__python, {
+        args: ['-c', s_script],
+        cwd: s_root_dir,
+        stdout: 'piped',
+        stderr: 'piped',
+    });
+    let o_output = await o_process.output();
+    if (o_output.code !== 0) {
+        let s_stderr = new TextDecoder().decode(o_output.stderr);
+        console.error('glb-to-stl failed:', s_stderr);
+        throw new Error('glb-to-stl conversion failed: ' + s_stderr);
+    }
+    console.log('converted to STL:', s_path_stl);
+    return s_path_stl;
+};
+
 export {
     f_init_python,
     f_o_uttdatainfo,
     f_install_linux_binary,
+    f_convert_glb_to_stl,
 };

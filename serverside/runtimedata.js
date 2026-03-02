@@ -25,6 +25,45 @@ let s_path__venv = Deno.env.get('PATH_VENV') ?? './venv';
 
 let s_bin__glances = Deno.env.get('BIN_GLANCES') ?? 'glances';
 
+let s_api_key__fal_ai = Deno.env.get('S_API_KEY_FAL_AI') ?? '';
+
+let a_s_animal = [
+ "cat",
+  "fox",
+  "elephant",
+  "wolf",
+  "rabbit",
+  "bear",
+  "deer",
+  "owl",
+  "whale",
+  "lion",
+  "penguin",
+  "eagle",
+  "turtle",
+  "horse",
+  "dolphin",
+  "cat",
+  "rhinoceros",
+  "flamingo",
+  "gorilla",
+  "shark",
+  "frog",
+  "giraffe",
+  "octopus",
+  "koala",
+  "parrot",
+  "crocodile",
+  "chameleon",
+  "hedgehog",
+  "bull",
+  "swan",
+  "scorpion"
+];
+// let s_prompt__default = `Low-polygon animal figurine of a [s], geometric faceted surfaces, minimal triangle mesh style, smooth solid matte colors, subtle pastel tones, stylized miniature sculpture, clean hard edges between flat polygonal faces, isometric view, 45-degree angle, orthographic camera, no perspective distortion, flat shading, isolated on a pure white background, clean cutout, no shadows, no background elements, centered composition, high-key lighting, sharp focus, PNG style transparent-ready renderLow-polygon animal figurine, geometric faceted surfaces, minimal triangle mesh style, smooth solid matte colors, subtle pastel tones, stylized miniature sculpture, clean hard edges between flat polygonal faces, isometric view, 45-degree angle, orthographic camera, no perspective distortion, flat shading, isolated on a pure white background, clean cutout, no shadows, no background elements, centered composition, high-key lighting, sharp focus, PNG style transparent-ready render`
+let s_prompt__default = `Low-polygon [s] figurine, geometric faceted surfaces, minimal triangle mesh style, smooth solid matte colors, subtle pastel tones, stylized miniature sculpture, chunky simplified proportions, clean hard edges between flat polygonal faces, isometric view, 45-degree angle, orthographic camera, no perspective distortion, flat shading, isolated on a pure white background, clean cutout, no shadows, no background elements, centered composition, high-key lighting, sharp focus, PNG style transparent-ready render`;
+
+
 export {
     s_root_dir,
     s_ds,
@@ -36,4 +75,7 @@ export {
     s_bin__python,
     s_path__venv,
     s_bin__glances,
+    s_api_key__fal_ai,
+    a_s_animal,
+    s_prompt__default
 }

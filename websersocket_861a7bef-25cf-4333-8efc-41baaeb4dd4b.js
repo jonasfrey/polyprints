@@ -6,7 +6,7 @@ import {
     f_v_crud__indb,
 } from "./serverside/database_functions.js";
 import { f_a_o_fsnode, f_o_uttdatainfo__read_or_create, f_v_result_from_o_wsmsg } from "./serverside/functions.js";
-import { f_init_python } from "./serverside/cli_functions.js";
+import { f_init_python, f_convert_glb_to_stl } from "./serverside/cli_functions.js";
 import {
     a_o_model,
     f_o_model__from_s_name_table,
@@ -31,6 +31,9 @@ import {
     s_root_dir,
     n_port,
     s_dir__static,
+    s_api_key__fal_ai,
+    a_s_animal,
+    s_prompt__default,
 } from "./serverside/runtimedata.js";
 import { s_db_create, s_db_read, s_db_update, s_db_delete } from "./localhost/runtimedata.js";
 
@@ -50,6 +53,54 @@ let a_o_socket = [];
 await f_init_db();
 await f_init_python();
 await f_generate_model_constructors_for_cli_languages();
+
+// ensure generated output directory exists
+let s_dir__generated = s_root_dir + s_ds + '.gitignored' + s_ds + 'generated';
+try { await Deno.mkdir(s_dir__generated, { recursive: true }); } catch { /* exists */ }
+
+// fal.ai queue-based API helper: submit, poll, return result
+let f_o_fal_queue = async function(s_model_id, o_body) {
+    let s_url_base = 'https://queue.fal.run/' + s_model_id;
+    // submit
+    let o_resp_submit = await fetch(s_url_base, {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/json',
+            'Authorization': 'Key ' + s_api_key__fal_ai,
+        },
+        body: JSON.stringify(o_body),
+    });
+    let s_resp_text = await o_resp_submit.text();
+    console.log('fal.ai submit response:', o_resp_submit.status, s_resp_text.slice(0, 500));
+    if (!o_resp_submit.ok) {
+        throw new Error('fal.ai submit failed (' + o_resp_submit.status + '): ' + s_resp_text);
+    }
+    let o_queue = JSON.parse(s_resp_text);
+    let s_url_status = o_queue.status_url;
+    let s_url_response = o_queue.response_url;
+    // poll until completed
+    let n_max_polls = 120;
+    for (let n_i = 0; n_i < n_max_polls; n_i++) {
+        await new Promise(function(f_resolve) { setTimeout(f_resolve, 2000); });
+        let o_resp_status = await fetch(s_url_status, {
+            headers: { 'Authorization': 'Key ' + s_api_key__fal_ai },
+        });
+        let s_status_text = await o_resp_status.text();
+        console.log('fal.ai poll:', s_status_text.slice(0, 200));
+        let o_status = JSON.parse(s_status_text);
+        if (o_status.status === 'COMPLETED') break;
+        if (o_status.status === 'FAILED') throw new Error('fal.ai generation failed');
+    }
+    // fetch result
+    let o_resp_result = await fetch(s_url_response, {
+        headers: { 'Authorization': 'Key ' + s_api_key__fal_ai },
+    });
+    if (!o_resp_result.ok) {
+        let s_err = await o_resp_result.text();
+        throw new Error('fal.ai result fetch failed: ' + s_err);
+    }
+    return await o_resp_result.json();
+};
 
 // initialize server-side state with DB table data
 for (let o_model of a_o_model) {
@@ -136,6 +187,24 @@ let f_handler = async function(o_request, o_conninfo) {
                     {
                         s_property: 's_ds',
                         value: s_ds
+                    }
+                )
+            ));
+            o_socket.send(JSON.stringify(
+                f_o_wsmsg(
+                    o_wsmsg__set_state_data.s_name,
+                    {
+                        s_property: 'a_s_animal',
+                        value: a_s_animal
+                    }
+                )
+            ));
+            o_socket.send(JSON.stringify(
+                f_o_wsmsg(
+                    o_wsmsg__set_state_data.s_name,
+                    {
+                        s_property: 's_prompt__default',
+                        value: s_prompt__default
                     }
                 )
             ));
@@ -381,11 +450,80 @@ let f_handler = async function(o_request, o_conninfo) {
             if (s_path_file.endsWith('.wav')) s_content_type = 'audio/wav';
             if (s_path_file.endsWith('.mp3')) s_content_type = 'audio/mpeg';
             if (s_path_file.endsWith('.ogg')) s_content_type = 'audio/ogg';
+            if (s_path_file.endsWith('.glb')) s_content_type = 'model/gltf-binary';
+            if (s_path_file.endsWith('.stl')) s_content_type = 'model/stl';
             return new Response(a_n_byte, {
                 headers: { 'content-type': s_content_type },
             });
         } catch {
             return new Response('File not found', { status: 404 });
+        }
+    }
+
+    // generate image via fal.ai nano-banana-2
+    if (s_path === '/api/generate-image' && o_request.method === 'POST') {
+        try {
+            let o_body = await o_request.json();
+            let s_prompt = o_body.s_prompt;
+            if (!s_prompt) return new Response(JSON.stringify({ s_error: 'missing s_prompt' }), { status: 400, headers: { 'content-type': 'application/json' } });
+            let s_word = o_body.s_word || 'unknown';
+            console.log('generating image for:', s_word);
+            let o_result = await f_o_fal_queue('fal-ai/nano-banana-2', {
+                prompt: s_prompt,
+            });
+            let s_url_image = o_result.images[0].url;
+            // download image to local filesystem
+            let s_filename = s_word.replace(/[^a-zA-Z0-9]/g, '_') + '_' + Date.now() + '.png';
+            let s_path_image = s_dir__generated + s_ds + s_filename;
+            let o_resp_img = await fetch(s_url_image);
+            let a_n_byte = new Uint8Array(await o_resp_img.arrayBuffer());
+            await Deno.writeFile(s_path_image, a_n_byte);
+            console.log('image saved:', s_path_image);
+            return new Response(JSON.stringify({ s_path_image, s_url_image }), { headers: { 'content-type': 'application/json' } });
+        } catch (o_error) {
+            console.error('generate-image error:', o_error.message);
+            return new Response(JSON.stringify({ s_error: o_error.message }), { status: 500, headers: { 'content-type': 'application/json' } });
+        }
+    }
+
+    // generate 3D model via fal.ai hunyuan3d-v21
+    if (s_path === '/api/generate-model' && o_request.method === 'POST') {
+        try {
+            let o_body = await o_request.json();
+            let s_url_image = o_body.s_url_image;
+            if (!s_url_image) return new Response(JSON.stringify({ s_error: 'missing s_url_image' }), { status: 400, headers: { 'content-type': 'application/json' } });
+            let s_word = o_body.s_word || 'unknown';
+            console.log('generating 3D model for:', s_word);
+            let o_result = await f_o_fal_queue('fal-ai/hunyuan3d-v21', {
+                input_image_url: s_url_image,
+            });
+            console.log('hunyuan3d result keys:', Object.keys(o_result));
+            let s_url_model = o_result.model_glb.url;
+            // download model to local filesystem
+            let s_filename = s_word.replace(/[^a-zA-Z0-9]/g, '_') + '_' + Date.now() + '.glb';
+            let s_path_model = s_dir__generated + s_ds + s_filename;
+            let o_resp_model = await fetch(s_url_model);
+            let a_n_byte = new Uint8Array(await o_resp_model.arrayBuffer());
+            await Deno.writeFile(s_path_model, a_n_byte);
+            console.log('model saved:', s_path_model);
+            return new Response(JSON.stringify({ s_path_model }), { headers: { 'content-type': 'application/json' } });
+        } catch (o_error) {
+            console.error('generate-model error:', o_error.message);
+            return new Response(JSON.stringify({ s_error: o_error.message }), { status: 500, headers: { 'content-type': 'application/json' } });
+        }
+    }
+
+    // convert GLB to STL
+    if (s_path === '/api/convert-stl' && o_request.method === 'POST') {
+        try {
+            let o_body = await o_request.json();
+            let s_path_glb = o_body.s_path_glb;
+            if (!s_path_glb) return new Response(JSON.stringify({ s_error: 'missing s_path_glb' }), { status: 400, headers: { 'content-type': 'application/json' } });
+            let s_path_stl = await f_convert_glb_to_stl(s_path_glb);
+            return new Response(JSON.stringify({ s_path_stl }), { headers: { 'content-type': 'application/json' } });
+        } catch (o_error) {
+            console.error('convert-stl error:', o_error.message);
+            return new Response(JSON.stringify({ s_error: o_error.message }), { status: 500, headers: { 'content-type': 'application/json' } });
         }
     }
 
