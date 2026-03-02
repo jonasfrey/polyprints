@@ -108,9 +108,30 @@ let a_o_data_default = [
         }
     },
     {
+        o_course: {
+            s_name: 'History 101', 
+            a_o_student: [
+                'Gretel',
+                'Olaf',
+                'Daria', 
+                'John'
+            ]
+        }
+    },
+    {
         o_keyvalpair: {
             s_key: 's_path_absolute__filebrowser',
             s_value: '/home'
+        }
+    }, 
+    {
+        o_model__o_imagegeneratorprompt: {
+            s_prompt_template: 'a photo of a {s}',
+            a_o_imagegeneratorsubject: [
+                {s_name: 'cat'},
+                {s_name: 'dog'},
+                {s_name: 'rabbit'},
+            ]
         }
     }
 ]
@@ -205,6 +226,36 @@ let o_model__o_utterance = f_o_model({
         f_o_model_prop__timestamp_default(s_name_prop_ts_updated),
     ]
 });
+
+let o_model__o_imagegeneratorsubject = f_o_model({
+    s_name: 'o_imagegeneratorsubject',
+    a_o_property: [
+        f_o_model_prop__default_id('n_id'),
+        f_o_property('s_name', 'string', (s)=>{return s!==''}),
+        f_o_model_prop__timestamp_default(s_name_prop_ts_created),
+        f_o_model_prop__timestamp_default(s_name_prop_ts_updated),
+    ]
+});
+
+let o_model__o_imagegeneratorprompt = f_o_model({
+    s_name: 'o_imagegeneratorprompt',
+    a_o_property: [
+        f_o_model_prop__default_id('n_id'),
+        f_o_property('s_prompt_template', 'string', (s)=>{return s!==''}),
+        f_o_model_prop__timestamp_default(s_name_prop_ts_created),
+        f_o_model_prop__timestamp_default(s_name_prop_ts_updated),
+    ]
+});
+let o_model__o_imagegeneratorprompt_o_imagegeneratorsubject = f_o_model({
+    s_name: 'o_imagegeneratorprompt_o_imagegeneratorsubject',
+    a_o_property: [
+        f_o_model_prop__default_id('n_id'),
+        f_o_model_prop__default_id(f_s_name_foreign_key__from_o_model(o_model__o_imagegeneratorprompt)),
+        f_o_model_prop__default_id(f_s_name_foreign_key__from_o_model(o_model__o_imagegeneratorsubject)),
+        f_o_model_prop__timestamp_default(s_name_prop_ts_created),
+        f_o_model_prop__timestamp_default(s_name_prop_ts_updated),
+    ]
+}); 
 
 let f_o_example_instance_connected_cricular_from_o_model = function(o_model, a_s_name__visited = []){
     let o = {};

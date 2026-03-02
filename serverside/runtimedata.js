@@ -27,7 +27,8 @@ let s_bin__glances = Deno.env.get('BIN_GLANCES') ?? 'glances';
 
 let s_api_key__fal_ai = Deno.env.get('S_API_KEY_FAL_AI') ?? '';
 
-let a_s_animal = [
+
+let a_s_object__animal = [
  "cat",
   "fox",
   "elephant",
@@ -61,8 +62,46 @@ let a_s_animal = [
   "scorpion"
 ];
 // let s_prompt__default = `Low-polygon animal figurine of a [s], geometric faceted surfaces, minimal triangle mesh style, smooth solid matte colors, subtle pastel tones, stylized miniature sculpture, clean hard edges between flat polygonal faces, isometric view, 45-degree angle, orthographic camera, no perspective distortion, flat shading, isolated on a pure white background, clean cutout, no shadows, no background elements, centered composition, high-key lighting, sharp focus, PNG style transparent-ready renderLow-polygon animal figurine, geometric faceted surfaces, minimal triangle mesh style, smooth solid matte colors, subtle pastel tones, stylized miniature sculpture, clean hard edges between flat polygonal faces, isometric view, 45-degree angle, orthographic camera, no perspective distortion, flat shading, isolated on a pure white background, clean cutout, no shadows, no background elements, centered composition, high-key lighting, sharp focus, PNG style transparent-ready render`
-let s_prompt__default = `Low-polygon [s] figurine, geometric faceted surfaces, minimal triangle mesh style, smooth solid matte colors, subtle pastel tones, stylized miniature sculpture, chunky simplified proportions, clean hard edges between flat polygonal faces, isometric view, 45-degree angle, orthographic camera, no perspective distortion, flat shading, isolated on a pure white background, clean cutout, no shadows, no background elements, centered composition, high-key lighting, sharp focus, PNG style transparent-ready render`;
+let s_prompt__animal = `Low-polygon [s] figurine, geometric faceted surfaces, minimal triangle mesh style, smooth solid matte colors, subtle pastel tones, stylized miniature sculpture, chunky simplified proportions, clean hard edges between flat polygonal faces, isometric view, 45-degree angle, orthographic camera, no perspective distortion, flat shading, isolated on a pure white background, clean cutout, no shadows, no background elements, centered composition, high-key lighting, sharp focus, PNG style transparent-ready render`;
 
+
+// Group 1 — Strong silhouettes, work perfectly with base prompt
+let a_s_object__plant_group1 = [
+    "cactus",
+    "pine tree",
+    "palm tree",
+    "oak tree",
+    "succulent",
+    "bonsai tree",
+    "baobab tree",
+    "mushroom",
+    "aloe vera",
+    "lily pad",
+];
+let s_prompt__plant_group1 = `Low-polygon [s] figurine, geometric faceted surfaces, minimal triangle mesh style, smooth solid matte colors, subtle pastel green and earth tones, stylized miniature botanical sculpture, clean hard edges between flat polygonal faces, chunky simplified proportions, isometric view, 45-degree angle, orthographic camera, no perspective distortion, flat shading, isolated on a pure white background, clean cutout, no shadows, no background elements, centered composition, high-key lighting, sharp focus, PNG style transparent-ready render`;
+
+// Group 2 — Thin or flat plants, need reinforced thickness
+let a_s_object__plant_group2 = [
+    "bamboo",
+    "fern",
+    "monstera leaf",
+    "venus flytrap",
+    "sunflower",
+];
+let s_prompt__plant_group2 = `Low-polygon [s] figurine, geometric faceted surfaces, minimal triangle mesh style, smooth solid matte colors, subtle pastel green and earth tones, stylized miniature botanical sculpture, clean hard edges between flat polygonal faces, chunky simplified proportions, thick stylized stems, bold exaggerated leaf shapes, isometric view, 45-degree angle, orthographic camera, no perspective distortion, flat shading, isolated on a pure white background, clean cutout, no shadows, no background elements, centered composition, high-key lighting, sharp focus, PNG style transparent-ready render`;
+
+// Group 3 — Fine detail plants, need simplification
+let a_s_object__plant_group3 = [
+    "cherry blossom tree",
+    "willow tree",
+    "rose",
+    "tulip",
+    "lotus flower",
+];
+let s_prompt__plant_group3 = `Low-polygon [s] figurine, geometric faceted surfaces, minimal triangle mesh style, smooth solid matte colors, subtle pastel green and earth tones, stylized miniature botanical sculpture, clean hard edges between flat polygonal faces, chunky simplified proportions, simplified canopy, minimal branches, oversized bloom, exaggerated petals, isometric view, 45-degree angle, orthographic camera, no perspective distortion, flat shading, isolated on a pure white background, clean cutout, no shadows, no background elements, centered composition, high-key lighting, sharp focus, PNG style transparent-ready render`;
+
+let a_s_object = a_s_object__plant_group3;
+let s_prompt = s_prompt__plant_group3
 
 export {
     s_root_dir,
