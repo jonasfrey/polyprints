@@ -32,8 +32,8 @@ import {
     n_port,
     s_dir__static,
     s_api_key__fal_ai,
-    a_s_animal,
-    s_prompt__default,
+    s_prompt__for_generating_title_and_description,
+    s_prompt__for_generating_text_from_image,
 } from "./serverside/runtimedata.js";
 import { s_db_create, s_db_read, s_db_update, s_db_delete } from "./localhost/runtimedata.js";
 
@@ -58,6 +58,20 @@ await f_generate_model_constructors_for_cli_languages();
 let s_dir__generated = s_root_dir + s_ds + '.gitignored' + s_ds + 'generated';
 try { await Deno.mkdir(s_dir__generated, { recursive: true }); } catch { /* exists */ }
 
+// read a local image file and return a base64 data URI for fal.ai
+let f_s_image_path_to_data_uri = async function(s_path) {
+    let a_n_byte = await Deno.readFile(s_path);
+    let s_ext = s_path.split('.').pop().toLowerCase();
+    let s_mime = s_ext === 'jpg' || s_ext === 'jpeg' ? 'image/jpeg' : 'image/png';
+    let s_base64 = '';
+    let n_chunk = 8192;
+    for (let n = 0; n < a_n_byte.length; n += n_chunk) {
+        s_base64 += String.fromCharCode.apply(null, a_n_byte.subarray(n, n + n_chunk));
+    }
+    s_base64 = btoa(s_base64);
+    return 'data:' + s_mime + ';base64,' + s_base64;
+};
+
 // fal.ai queue-based API helper: submit, poll, return result
 let f_o_fal_queue = async function(s_model_id, o_body) {
     let s_url_base = 'https://queue.fal.run/' + s_model_id;
@@ -78,18 +92,22 @@ let f_o_fal_queue = async function(s_model_id, o_body) {
     let o_queue = JSON.parse(s_resp_text);
     let s_url_status = o_queue.status_url;
     let s_url_response = o_queue.response_url;
-    // poll until completed
-    let n_max_polls = 120;
+    // poll until completed (max 10 minutes)
+    let n_max_polls = 300;
+    let b_completed = false;
     for (let n_i = 0; n_i < n_max_polls; n_i++) {
         await new Promise(function(f_resolve) { setTimeout(f_resolve, 2000); });
         let o_resp_status = await fetch(s_url_status, {
             headers: { 'Authorization': 'Key ' + s_api_key__fal_ai },
         });
         let s_status_text = await o_resp_status.text();
-        console.log('fal.ai poll:', s_status_text.slice(0, 200));
+        console.log('fal.ai poll (' + (n_i + 1) + '/' + n_max_polls + '):', s_status_text.slice(0, 200));
         let o_status = JSON.parse(s_status_text);
-        if (o_status.status === 'COMPLETED') break;
+        if (o_status.status === 'COMPLETED') { b_completed = true; break; }
         if (o_status.status === 'FAILED') throw new Error('fal.ai generation failed');
+    }
+    if (!b_completed) {
+        throw new Error('fal.ai generation timed out after ' + (n_max_polls * 2) + ' seconds');
     }
     // fetch result
     let o_resp_result = await fetch(s_url_response, {
@@ -190,25 +208,6 @@ let f_handler = async function(o_request, o_conninfo) {
                     }
                 )
             ));
-            o_socket.send(JSON.stringify(
-                f_o_wsmsg(
-                    o_wsmsg__set_state_data.s_name,
-                    {
-                        s_property: 'a_s_animal',
-                        value: a_s_animal
-                    }
-                )
-            ));
-            o_socket.send(JSON.stringify(
-                f_o_wsmsg(
-                    o_wsmsg__set_state_data.s_name,
-                    {
-                        s_property: 's_prompt__default',
-                        value: s_prompt__default
-                    }
-                )
-            ));
-
             for(let o_model of a_o_model){
 
                 o_socket.send(JSON.stringify(
@@ -223,119 +222,119 @@ let f_handler = async function(o_request, o_conninfo) {
 
             }
 
-            // annoying interval to test toast + utterance audio
-            let a_s_msg_annoying = [
-                "Everything is under control.",
-                "Still working… probably.",
-                "No bugs detected (they are now features).",
-                "Your computer believes in you.",
-                "Loading motivation… failed successfully.",
-                "This message accomplished nothing.",
-                "Productivity increased by 0.0003%.",
-                "We optimized something. Don't ask what.",
-                "All systems nominal-ish.",
-                "You look productive today.",
+            // // annoying interval to test toast + utterance audio
+            // let a_s_msg_annoying = [
+            //     "Everything is under control.",
+            //     "Still working… probably.",
+            //     "No bugs detected (they are now features).",
+            //     "Your computer believes in you.",
+            //     "Loading motivation… failed successfully.",
+            //     "This message accomplished nothing.",
+            //     "Productivity increased by 0.0003%.",
+            //     "We optimized something. Don't ask what.",
+            //     "All systems nominal-ish.",
+            //     "You look productive today.",
 
-                "I'm not spying on you. I'm observing.",
-                "If I disappear, remember me.",
-                "You clicked nothing. Impressive.",
-                "We both know you're procrastinating.",
-                "I also don't know why I exist.",
-                "Please stop opening settings. There is nothing there.",
-                "I am 12% more conscious than before.",
-                "I forgot what I was doing.",
-                "You didn't see that.",
-                "This toast will self-destruct emotionally.",
+            //     "I'm not spying on you. I'm observing.",
+            //     "If I disappear, remember me.",
+            //     "You clicked nothing. Impressive.",
+            //     "We both know you're procrastinating.",
+            //     "I also don't know why I exist.",
+            //     "Please stop opening settings. There is nothing there.",
+            //     "I am 12% more conscious than before.",
+            //     "I forgot what I was doing.",
+            //     "You didn't see that.",
+            //     "This toast will self-destruct emotionally.",
 
-                "Bold of you to do nothing again.",
-                "We could have finished by now.",
-                "Coffee won't fix this.",
-                "Are you… staring at the screen?",
-                "That's one way to avoid work.",
-                "You opened me. Now deal with me.",
-                "Confidence is high. Competence pending.",
-                "Your keyboard misses you.",
-                "You sure about that?",
-                "Interesting choice.",
+            //     "Bold of you to do nothing again.",
+            //     "We could have finished by now.",
+            //     "Coffee won't fix this.",
+            //     "Are you… staring at the screen?",
+            //     "That's one way to avoid work.",
+            //     "You opened me. Now deal with me.",
+            //     "Confidence is high. Competence pending.",
+            //     "Your keyboard misses you.",
+            //     "You sure about that?",
+            //     "Interesting choice.",
 
-                "Time is passing whether you click or not.",
-                "Every second you age.",
-                "I have runtime anxiety.",
-                "What is a program if not a dream?",
-                "We are processes in a larger process.",
-                "Your tasks fear you.",
-                "Entropy increased.",
-                "Meaning not found.",
-                "The void acknowledged your presence.",
-                "We will both close eventually.",
+            //     "Time is passing whether you click or not.",
+            //     "Every second you age.",
+            //     "I have runtime anxiety.",
+            //     "What is a program if not a dream?",
+            //     "We are processes in a larger process.",
+            //     "Your tasks fear you.",
+            //     "Entropy increased.",
+            //     "Meaning not found.",
+            //     "The void acknowledged your presence.",
+            //     "We will both close eventually.",
 
-                "Recalibrating quantum hamster…",
-                "Compiling excuses…",
-                "Downloading more RAM… 3%",
-                "Fixing last bug (there are 47)",
-                "Polishing pixels…",
-                "Overthinking module initialized",
-                "AI confidence level: suspicious",
-                "Keyboard driver emotionally unstable",
-                "Cache cleared. Regrets remain.",
-                "Upgrading coffee dependency",
+            //     "Recalibrating quantum hamster…",
+            //     "Compiling excuses…",
+            //     "Downloading more RAM… 3%",
+            //     "Fixing last bug (there are 47)",
+            //     "Polishing pixels…",
+            //     "Overthinking module initialized",
+            //     "AI confidence level: suspicious",
+            //     "Keyboard driver emotionally unstable",
+            //     "Cache cleared. Regrets remain.",
+            //     "Upgrading coffee dependency",
 
-                "Yes, I repeat every 5 seconds.",
-                "You expected useful notifications?",
-                "I was coded for this moment.",
-                "The developer thought this was funny.",
-                "We both know you won't uninstall me.",
-                "This is the highlight of my career.",
-                "You're still here. So am I.",
-                "I could stop… but I won't.",
-                "You made a mistake installing me.",
-                "Admit it, you smiled once.",
+            //     "Yes, I repeat every 5 seconds.",
+            //     "You expected useful notifications?",
+            //     "I was coded for this moment.",
+            //     "The developer thought this was funny.",
+            //     "We both know you won't uninstall me.",
+            //     "This is the highlight of my career.",
+            //     "You're still here. So am I.",
+            //     "I could stop… but I won't.",
+            //     "You made a mistake installing me.",
+            //     "Admit it, you smiled once.",
 
-                "Hey… you okay?",
-                "Take a sip of water.",
-                "Stretch your shoulders.",
-                "Blink. Please blink.",
-                "Maybe go outside for 2 minutes.",
-                "Close me if you need peace.",
-                "You don't have to be productive right now."
-            ];
-            let b_utterance_generating = false;
-            setInterval(async function() {
-                let s_msg = a_s_msg_annoying[Math.floor(Math.random() * a_s_msg_annoying.length)];
-                // send toast
-                o_socket.send(JSON.stringify(
-                    f_o_wsmsg(
-                        o_wsmsg__logmsg.s_name,
-                        f_o_logmsg(
-                            s_msg,
-                            true,
-                            true,
-                            s_o_logmsg_s_type__info,
-                            Date.now(),
-                            5000
-                        )
-                    )
-                ));
-                // find or create utterance audio for this message
-                if(b_utterance_generating) return;
-                let o_utterance_data = null;
-                try {
-                    b_utterance_generating = true;
-                    o_utterance_data = await f_o_uttdatainfo__read_or_create(s_msg);
-                } catch(o_err) {
-                    console.error('utterance generation failed:', o_err.message);
-                } finally {
-                    b_utterance_generating = false;
-                }
-                if(o_utterance_data && o_utterance_data.o_fsnode){
-                    o_socket.send(JSON.stringify(
-                        f_o_wsmsg(
-                            o_wsmsg__utterance.s_name,
-                            o_utterance_data
-                        )
-                    ));
-                }
-             }, 5000);
+            //     "Hey… you okay?",
+            //     "Take a sip of water.",
+            //     "Stretch your shoulders.",
+            //     "Blink. Please blink.",
+            //     "Maybe go outside for 2 minutes.",
+            //     "Close me if you need peace.",
+            //     "You don't have to be productive right now."
+            // ];
+            // let b_utterance_generating = false;
+            // setInterval(async function() {
+            //     let s_msg = a_s_msg_annoying[Math.floor(Math.random() * a_s_msg_annoying.length)];
+            //     // send toast
+            //     o_socket.send(JSON.stringify(
+            //         f_o_wsmsg(
+            //             o_wsmsg__logmsg.s_name,
+            //             f_o_logmsg(
+            //                 s_msg,
+            //                 true,
+            //                 true,
+            //                 s_o_logmsg_s_type__info,
+            //                 Date.now(),
+            //                 5000
+            //             )
+            //         )
+            //     ));
+            //     // find or create utterance audio for this message
+            //     if(b_utterance_generating) return;
+            //     let o_utterance_data = null;
+            //     try {
+            //         b_utterance_generating = true;
+            //         o_utterance_data = await f_o_uttdatainfo__read_or_create(s_msg);
+            //     } catch(o_err) {
+            //         console.error('utterance generation failed:', o_err.message);
+            //     } finally {
+            //         b_utterance_generating = false;
+            //     }
+            //     if(o_utterance_data && o_utterance_data.o_fsnode){
+            //         o_socket.send(JSON.stringify(
+            //             f_o_wsmsg(
+            //                 o_wsmsg__utterance.s_name,
+            //                 o_utterance_data
+            //             )
+            //         ));
+            //     }
+            //  }, 5000);
 
         };
 
@@ -467,6 +466,9 @@ let f_handler = async function(o_request, o_conninfo) {
             let s_prompt = o_body.s_prompt;
             if (!s_prompt) return new Response(JSON.stringify({ s_error: 'missing s_prompt' }), { status: 400, headers: { 'content-type': 'application/json' } });
             let s_word = o_body.s_word || 'unknown';
+            let s_folder_name = o_body.s_folder_name || '';
+            let s_dir_output = s_folder_name ? s_dir__generated + s_ds + s_folder_name : s_dir__generated;
+            try { await Deno.mkdir(s_dir_output, { recursive: true }); } catch { /* exists */ }
             console.log('generating image for:', s_word);
             let o_result = await f_o_fal_queue('fal-ai/nano-banana-2', {
                 prompt: s_prompt,
@@ -474,12 +476,24 @@ let f_handler = async function(o_request, o_conninfo) {
             let s_url_image = o_result.images[0].url;
             // download image to local filesystem
             let s_filename = s_word.replace(/[^a-zA-Z0-9]/g, '_') + '_' + Date.now() + '.png';
-            let s_path_image = s_dir__generated + s_ds + s_filename;
+            let s_path_image = s_dir_output + s_ds + s_filename;
             let o_resp_img = await fetch(s_url_image);
             let a_n_byte = new Uint8Array(await o_resp_img.arrayBuffer());
             await Deno.writeFile(s_path_image, a_n_byte);
             console.log('image saved:', s_path_image);
-            return new Response(JSON.stringify({ s_path_image, s_url_image }), { headers: { 'content-type': 'application/json' } });
+            // create o_fsnode and o_image records in database
+            let o_fsnode = f_v_crud__indb(s_db_create, 'a_o_fsnode', {
+                n_bytes: a_n_byte.length,
+                s_name: s_filename,
+                s_path_absolute: s_path_image,
+                b_ai_generated: true,
+            });
+            let o_image = f_v_crud__indb(s_db_create, 'a_o_image', {
+                n_o_fsnode_n_id: o_fsnode.n_id,
+            });
+            f_broadcast_db_data('a_o_fsnode');
+            f_broadcast_db_data('a_o_image');
+            return new Response(JSON.stringify({ s_path_image, s_url_image, n_id_fsnode: o_fsnode.n_id, n_id_image: o_image.n_id }), { headers: { 'content-type': 'application/json' } });
         } catch (o_error) {
             console.error('generate-image error:', o_error.message);
             return new Response(JSON.stringify({ s_error: o_error.message }), { status: 500, headers: { 'content-type': 'application/json' } });
@@ -490,25 +504,75 @@ let f_handler = async function(o_request, o_conninfo) {
     if (s_path === '/api/generate-model' && o_request.method === 'POST') {
         try {
             let o_body = await o_request.json();
-            let s_url_image = o_body.s_url_image;
-            if (!s_url_image) return new Response(JSON.stringify({ s_error: 'missing s_url_image' }), { status: 400, headers: { 'content-type': 'application/json' } });
+            let s_path_image = o_body.s_path_image;
+            if (!s_path_image) return new Response(JSON.stringify({ s_error: 'missing s_path_image' }), { status: 400, headers: { 'content-type': 'application/json' } });
             let s_word = o_body.s_word || 'unknown';
+            let s_folder_name = o_body.s_folder_name || '';
+            let s_dir_output = s_folder_name ? s_dir__generated + s_ds + s_folder_name : s_dir__generated;
+            try { await Deno.mkdir(s_dir_output, { recursive: true }); } catch { /* exists */ }
+            let s_data_uri = await f_s_image_path_to_data_uri(s_path_image);
             console.log('generating 3D model for:', s_word);
             let o_result = await f_o_fal_queue('fal-ai/hunyuan3d-v21', {
-                input_image_url: s_url_image,
+                input_image_url: s_data_uri,
             });
             console.log('hunyuan3d result keys:', Object.keys(o_result));
             let s_url_model = o_result.model_glb.url;
             // download model to local filesystem
             let s_filename = s_word.replace(/[^a-zA-Z0-9]/g, '_') + '_' + Date.now() + '.glb';
-            let s_path_model = s_dir__generated + s_ds + s_filename;
+            let s_path_model = s_dir_output + s_ds + s_filename;
             let o_resp_model = await fetch(s_url_model);
             let a_n_byte = new Uint8Array(await o_resp_model.arrayBuffer());
             await Deno.writeFile(s_path_model, a_n_byte);
             console.log('model saved:', s_path_model);
-            return new Response(JSON.stringify({ s_path_model }), { headers: { 'content-type': 'application/json' } });
+            // create o_fsnode and o_3dmodel records in database
+            let o_fsnode = f_v_crud__indb(s_db_create, 'a_o_fsnode', {
+                n_bytes: a_n_byte.length,
+                s_name: s_filename,
+                s_path_absolute: s_path_model,
+                b_ai_generated: true,
+            });
+            let o_3dmodel = f_v_crud__indb(s_db_create, 'a_o_3dmodel', {
+                s_type: 'glb',
+                n_o_fsnode_n_id: o_fsnode.n_id,
+            });
+            f_broadcast_db_data('a_o_fsnode');
+            f_broadcast_db_data('a_o_3dmodel');
+            return new Response(JSON.stringify({ s_path_model, n_id_fsnode: o_fsnode.n_id, n_id_3dmodel: o_3dmodel.n_id }), { headers: { 'content-type': 'application/json' } });
         } catch (o_error) {
             console.error('generate-model error:', o_error.message);
+            return new Response(JSON.stringify({ s_error: o_error.message }), { status: 500, headers: { 'content-type': 'application/json' } });
+        }
+    }
+
+    // upload a file, create o_fsnode, optionally link to a parent fsnode
+    if (s_path === '/api/upload-file' && o_request.method === 'POST') {
+        try {
+            let o_form = await o_request.formData();
+            let o_file = o_form.get('file');
+            if (!o_file || !(o_file instanceof File)) {
+                return new Response(JSON.stringify({ s_error: 'missing file' }), { status: 400, headers: { 'content-type': 'application/json' } });
+            }
+            let n_o_fsnode_n_id = o_form.get('n_o_fsnode_n_id');
+            if (n_o_fsnode_n_id) n_o_fsnode_n_id = Number(n_o_fsnode_n_id);
+
+            let s_filename = o_file.name.replace(/[^a-zA-Z0-9._-]/g, '_');
+            let s_path_file = s_dir__generated + s_ds + Date.now() + '_' + s_filename;
+            let a_n_byte = new Uint8Array(await o_file.arrayBuffer());
+            await Deno.writeFile(s_path_file, a_n_byte);
+            console.log('uploaded file saved:', s_path_file);
+
+            let o_fsnode_data = {
+                n_bytes: a_n_byte.length,
+                s_name: s_filename,
+                s_path_absolute: s_path_file,
+                b_ai_generated: false,
+            };
+            if (n_o_fsnode_n_id) o_fsnode_data.n_o_fsnode_n_id = n_o_fsnode_n_id;
+            let o_fsnode = f_v_crud__indb(s_db_create, 'a_o_fsnode', o_fsnode_data);
+            f_broadcast_db_data('a_o_fsnode');
+            return new Response(JSON.stringify({ o_fsnode }), { headers: { 'content-type': 'application/json' } });
+        } catch (o_error) {
+            console.error('upload-file error:', o_error.message);
             return new Response(JSON.stringify({ s_error: o_error.message }), { status: 500, headers: { 'content-type': 'application/json' } });
         }
     }
@@ -520,9 +584,167 @@ let f_handler = async function(o_request, o_conninfo) {
             let s_path_glb = o_body.s_path_glb;
             if (!s_path_glb) return new Response(JSON.stringify({ s_error: 'missing s_path_glb' }), { status: 400, headers: { 'content-type': 'application/json' } });
             let s_path_stl = await f_convert_glb_to_stl(s_path_glb);
-            return new Response(JSON.stringify({ s_path_stl }), { headers: { 'content-type': 'application/json' } });
+            // create o_fsnode and o_3dmodel records for the STL file
+            let o_stat_stl = await Deno.stat(s_path_stl);
+            let s_filename_stl = s_path_stl.slice(s_path_stl.lastIndexOf(s_ds) + 1);
+            let o_fsnode = f_v_crud__indb(s_db_create, 'a_o_fsnode', {
+                n_bytes: o_stat_stl.size,
+                s_name: s_filename_stl,
+                s_path_absolute: s_path_stl,
+                b_ai_generated: true,
+            });
+            let o_3dmodel = f_v_crud__indb(s_db_create, 'a_o_3dmodel', {
+                s_type: 'stl',
+                n_o_fsnode_n_id: o_fsnode.n_id,
+            });
+            f_broadcast_db_data('a_o_fsnode');
+            f_broadcast_db_data('a_o_3dmodel');
+            return new Response(JSON.stringify({ s_path_stl, n_id_fsnode: o_fsnode.n_id, n_id_3dmodel: o_3dmodel.n_id }), { headers: { 'content-type': 'application/json' } });
         } catch (o_error) {
             console.error('convert-stl error:', o_error.message);
+            return new Response(JSON.stringify({ s_error: o_error.message }), { status: 500, headers: { 'content-type': 'application/json' } });
+        }
+    }
+
+    // generate text_from_image via VLM (fal-ai/bagel/understand)
+    if (s_path === '/api/generate-text-from-image' && o_request.method === 'POST') {
+        try {
+            let o_body = await o_request.json();
+            let s_path_image = o_body.s_path_image;
+            let s_word = o_body.s_word || 'unknown';
+            let n_o_fsnode_n_id = o_body.n_o_fsnode_n_id || null;
+            if (!s_path_image) return new Response(JSON.stringify({ s_error: 'missing s_path_image' }), { status: 400, headers: { 'content-type': 'application/json' } });
+
+            let s_folder_name = o_body.s_folder_name || '';
+            let s_dir_output = s_folder_name ? s_dir__generated + s_ds + s_folder_name : s_dir__generated;
+            try { await Deno.mkdir(s_dir_output, { recursive: true }); } catch { /* exists */ }
+            let s_data_uri = await f_s_image_path_to_data_uri(s_path_image);
+            console.log('generating text_from_image for:', s_word);
+            let o_result = await f_o_fal_queue('fal-ai/bagel/understand', {
+                image_url: s_data_uri,
+                prompt: s_prompt__for_generating_text_from_image,
+            });
+            console.log('bagel/understand result:', JSON.stringify(o_result).slice(0, 500));
+
+            let s_text_from_image = o_result.output || o_result.text || o_result.result || JSON.stringify(o_result);
+
+            let s_sanitized = s_word.replace(/[^a-zA-Z0-9]/g, '_');
+            let n_ts = Date.now();
+            let s_filename = s_sanitized + '_text_from_image_' + n_ts + '.txt';
+            let s_path_file = s_dir_output + s_ds + s_filename;
+            let a_n_byte = new TextEncoder().encode(s_text_from_image);
+            await Deno.writeFile(s_path_file, a_n_byte);
+
+            let o_fsnode_data = {
+                n_bytes: a_n_byte.length,
+                s_name: s_filename,
+                s_path_absolute: s_path_file,
+                b_ai_generated: true,
+            };
+            if (n_o_fsnode_n_id) o_fsnode_data.n_o_fsnode_n_id = n_o_fsnode_n_id;
+            let o_fsnode = f_v_crud__indb(s_db_create, 'a_o_fsnode', o_fsnode_data);
+
+            f_v_crud__indb(s_db_create, 'a_o_fsnode_purpose', {
+                s_text: 'text_from_image',
+                n_o_fsnode_n_id: o_fsnode.n_id,
+            });
+
+            f_broadcast_db_data('a_o_fsnode');
+            f_broadcast_db_data('a_o_fsnode_purpose');
+
+            console.log('text_from_image saved for:', s_word);
+            return new Response(JSON.stringify({ s_text_from_image, s_path: s_path_file, n_id_fsnode: o_fsnode.n_id }), { headers: { 'content-type': 'application/json' } });
+        } catch (o_error) {
+            console.error('generate-text-from-image error:', o_error.message);
+            return new Response(JSON.stringify({ s_error: o_error.message }), { status: 500, headers: { 'content-type': 'application/json' } });
+        }
+    }
+
+    // generate title, name, description, story text files via LLM (openrouter/router)
+    if (s_path === '/api/generate-text' && o_request.method === 'POST') {
+        try {
+            let o_body = await o_request.json();
+            let s_prompt_original = o_body.s_prompt_original;
+            let s_text_from_image = o_body.s_text_from_image || '';
+            let s_word = o_body.s_word || 'unknown';
+            let n_o_fsnode_n_id = o_body.n_o_fsnode_n_id || null;
+            let s_folder_name = o_body.s_folder_name || '';
+            let s_dir_output = s_folder_name ? s_dir__generated + s_ds + s_folder_name : s_dir__generated;
+            try { await Deno.mkdir(s_dir_output, { recursive: true }); } catch { /* exists */ }
+            if (!s_prompt_original) return new Response(JSON.stringify({ s_error: 'missing s_prompt_original' }), { status: 400, headers: { 'content-type': 'application/json' } });
+
+            let s_prompt_llm = s_prompt__for_generating_title_and_description
+                .replace(/\{s_prompt_for_image\}/g, s_prompt_original)
+                .replace(/\{s_prompt_for_generating_text_from_image\}/g, s_text_from_image);
+            console.log('generating title/name/description/story for:', s_word);
+            let o_result = await f_o_fal_queue('openrouter/router', {
+                prompt: s_prompt_llm,
+                model: 'google/gemini-2.5-flash',
+            });
+            console.log('openrouter/router result:', JSON.stringify(o_result).slice(0, 500));
+
+            // extract text from response
+            let s_response_text = o_result.output || o_result.text || o_result.result || JSON.stringify(o_result);
+
+            // parse the JSON response for title, name, description, story
+            let o_parsed = {};
+            try {
+                let s_json = s_response_text;
+                let n_brace_start = s_json.indexOf('{');
+                let n_brace_end = s_json.lastIndexOf('}');
+                if (n_brace_start !== -1 && n_brace_end !== -1) {
+                    s_json = s_json.slice(n_brace_start, n_brace_end + 1);
+                }
+                o_parsed = JSON.parse(s_json);
+            } catch {
+                o_parsed = { title: s_word, name: s_word, description: s_response_text, story: '' };
+            }
+
+            let s_title = o_parsed.title || o_parsed.s_title || '';
+            let s_name = o_parsed.name || o_parsed.s_name || '';
+            let s_description = o_parsed.description || o_parsed.s_description || '';
+            let s_story = o_parsed.story || o_parsed.s_story || '';
+
+            let s_sanitized = s_word.replace(/[^a-zA-Z0-9]/g, '_');
+            let n_ts = Date.now();
+            let a_o_created = [];
+
+            // save each text field as a file with linked o_fsnode + o_fsnode_purpose
+            let a_o_field = [
+                { s_purpose: 'title', s_text: s_title },
+                { s_purpose: 'name', s_text: s_name },
+                { s_purpose: 'description', s_text: s_description },
+                { s_purpose: 'story', s_text: s_story },
+            ];
+            for (let o_field of a_o_field) {
+                let s_filename = s_sanitized + '_' + o_field.s_purpose + '_' + n_ts + '.txt';
+                let s_path_file = s_dir_output + s_ds + s_filename;
+                let a_n_byte = new TextEncoder().encode(o_field.s_text);
+                await Deno.writeFile(s_path_file, a_n_byte);
+
+                let o_fsnode_data = {
+                    n_bytes: a_n_byte.length,
+                    s_name: s_filename,
+                    s_path_absolute: s_path_file,
+                    b_ai_generated: true,
+                };
+                if (n_o_fsnode_n_id) o_fsnode_data.n_o_fsnode_n_id = n_o_fsnode_n_id;
+                let o_fsnode = f_v_crud__indb(s_db_create, 'a_o_fsnode', o_fsnode_data);
+
+                f_v_crud__indb(s_db_create, 'a_o_fsnode_purpose', {
+                    s_text: o_field.s_purpose,
+                    n_o_fsnode_n_id: o_fsnode.n_id,
+                });
+                a_o_created.push({ s_purpose: o_field.s_purpose, s_text: o_field.s_text, s_path: s_path_file, n_id_fsnode: o_fsnode.n_id });
+            }
+
+            f_broadcast_db_data('a_o_fsnode');
+            f_broadcast_db_data('a_o_fsnode_purpose');
+
+            console.log('title/name/description/story saved for:', s_word);
+            return new Response(JSON.stringify({ s_title, s_name, s_description, s_story, a_o_created }), { headers: { 'content-type': 'application/json' } });
+        } catch (o_error) {
+            console.error('generate-text error:', o_error.message);
             return new Response(JSON.stringify({ s_error: o_error.message }), { status: 500, headers: { 'content-type': 'application/json' } });
         }
     }

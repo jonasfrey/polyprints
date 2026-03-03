@@ -18,3 +18,25 @@ response=$(curl --request POST \
      "input_image_url": "https://storage.googleapis.com/falserverless/model_tests/video_models/robot.png"
    }')
 REQUEST_ID=$(echo "$response" | grep -o '"request_id": *"[^"]*"' | sed 's/"request_id": *//; s/"//g')
+
+# generate text from text 
+response=$(curl --request POST \
+  --url https://queue.fal.run/openrouter/router \
+  --header "Authorization: Key $FAL_KEY" \
+  --header "Content-Type: application/json" \
+  --data '{
+     "prompt": "Write a short story (under 200 words) about an AI that learns to dream. Use vivid sensory details and end with a surprising twist that makes the reader feel both awe and melancholy.",
+     "model": "google/gemini-2.5-flash"
+   }')
+REQUEST_ID=$(echo "$response" | grep -o '"request_id": *"[^"]*"' | sed 's/"request_id": *//; s/"//g')
+
+# generate text from image 
+response=$(curl --request POST \
+  --url https://queue.fal.run/fal-ai/bagel/understand \
+  --header "Authorization: Key $FAL_KEY" \
+  --header "Content-Type: application/json" \
+  --data '{
+     "image_url": "https://storage.googleapis.com/falserverless/bagel/wRhCPSyiKTiLnnWvUpGIl.jpeg",
+     "prompt": "What is shown in the image? "
+   }')
+REQUEST_ID=$(echo "$response" | grep -o '"request_id": *"[^"]*"' | sed 's/"request_id": *//; s/"//g')

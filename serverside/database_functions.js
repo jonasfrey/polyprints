@@ -234,7 +234,26 @@ let f_ensure_default_data = function(){
                 let o_instance__nested = f_o_instance__processed(o_model__nested, o_data[s_prop]);
                 a_o_nested.push({o_model: o_model__nested, o_instance: o_instance__nested});
             } else {
-                o_data_plain[s_prop] = o_data[s_prop];
+                // check if property name matches a table name (e.g. a_o_student) with an array value
+                let o_model__related = f_o_model__from_s_name_table(s_prop);
+                if(o_model__related && Array.isArray(o_data[s_prop])){
+                    for(let v_element of o_data[s_prop]){
+                        let o_data__element = null;
+                        if(typeof v_element === 'string'){
+                            // shorthand: string is treated as s_name value
+                            o_data__element = {s_name: v_element};
+                        } else if(typeof v_element === 'object' && v_element !== null){
+                            o_data__element = v_element;
+                        } else {
+                            console.warn(`Unsupported element type in ${s_prop}: ${typeof v_element}`);
+                            continue;
+                        }
+                        let o_instance__related = f_o_instance__processed(o_model__related, o_data__element);
+                        a_o_nested.push({o_model: o_model__related, o_instance: o_instance__related});
+                    }
+                } else {
+                    o_data_plain[s_prop] = o_data[s_prop];
+                }
             }
         }
 
@@ -283,6 +302,7 @@ let f_ensure_default_data = function(){
         }
     }
 };
+
 
 let f_a_o_instance__with_relations = function(o_model, a_n_id, a_s_name__visited = []){
     let s_name_table = f_s_name_table__from_o_model(o_model);

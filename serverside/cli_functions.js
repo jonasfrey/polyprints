@@ -7,6 +7,12 @@ import { s_db_create } from '../localhost/runtimedata.js';
 import { f_s_name_table__from_o_model, o_model__o_fsnode, o_model__o_utterance } from '../localhost/constructors.js';
 import { f_v_crud__indb } from './database_functions.js';
 
+import {
+  ImageMagick,
+  initializeImageMagick,
+  MagickGeometry,
+} from "https://deno.land/x/imagemagick_deno@0.0.31/mod.ts";
+
 let f_init_python = async function(){
     let a_s_package = ['python-dotenv', 'pyttsx3', 'trimesh', 'numpy'];
 
@@ -211,6 +217,40 @@ let f_convert_glb_to_stl = async function(s_path_glb) {
     console.log('converted to STL:', s_path_stl);
     return s_path_stl;
 };
+
+let f_create_thumbnail_from_stl = async function(s_path_stl){
+
+    //uses stl-thumb to create 4 rendered images (top,side, front, isometric) of the stl file
+    // creates one large image out of those 4 renders and saves it as thumbnail for the STL file
+    // uses imagemagick to combine the 4 renders into one image
+
+
+    // # Download the .deb from the latest release
+    // wget https://github.com/unlimitedbacon/stl-thumb/releases/download/v0.5.0/stl-thumb_0.5.0_amd64.deb
+
+    // # Install it
+    // sudo dpkg -i stl-thumb_0.5.0_amd64.deb
+
+    // # Fix any missing dependencies if needed
+    // sudo apt-get install -f
+
+
+    // example usage: 
+    // await initialize(); // make sure to initialize first!
+
+    // const data: Uint8Array = await Deno.readFile("image.jpg");
+
+    // await ImageMagick.read(data, async (img) => {
+    // img.resize(200, 100);
+    // img.blur(20, 6);
+
+    // await img.write(
+    //     MagickFormat.Jpeg,
+    //     (data) => Deno.writeFile("image-blur.jpg", data),
+    // );
+    // });
+
+}
 
 export {
     f_init_python,

@@ -27,81 +27,62 @@ let s_bin__glances = Deno.env.get('BIN_GLANCES') ?? 'glances';
 
 let s_api_key__fal_ai = Deno.env.get('S_API_KEY_FAL_AI') ?? '';
 
+// let s_prompt__for_generating_title_and_description_lowpoly = `You are a creative writer naming 3D printable low-poly figures for an online marketplace.
 
-let a_s_object__animal = [
- "cat",
-  "fox",
-  "elephant",
-  "wolf",
-  "rabbit",
-  "bear",
-  "deer",
-  "owl",
-  "whale",
-  "lion",
-  "penguin",
-  "eagle",
-  "turtle",
-  "horse",
-  "dolphin",
-  "cat",
-  "rhinoceros",
-  "flamingo",
-  "gorilla",
-  "shark",
-  "frog",
-  "giraffe",
-  "octopus",
-  "koala",
-  "parrot",
-  "crocodile",
-  "chameleon",
-  "hedgehog",
-  "bull",
-  "swan",
-  "scorpion"
-];
-// let s_prompt__default = `Low-polygon animal figurine of a [s], geometric faceted surfaces, minimal triangle mesh style, smooth solid matte colors, subtle pastel tones, stylized miniature sculpture, clean hard edges between flat polygonal faces, isometric view, 45-degree angle, orthographic camera, no perspective distortion, flat shading, isolated on a pure white background, clean cutout, no shadows, no background elements, centered composition, high-key lighting, sharp focus, PNG style transparent-ready renderLow-polygon animal figurine, geometric faceted surfaces, minimal triangle mesh style, smooth solid matte colors, subtle pastel tones, stylized miniature sculpture, clean hard edges between flat polygonal faces, isometric view, 45-degree angle, orthographic camera, no perspective distortion, flat shading, isolated on a pure white background, clean cutout, no shadows, no background elements, centered composition, high-key lighting, sharp focus, PNG style transparent-ready render`
-let s_prompt__animal = `Low-polygon [s] figurine, geometric faceted surfaces, minimal triangle mesh style, smooth solid matte colors, subtle pastel tones, stylized miniature sculpture, chunky simplified proportions, clean hard edges between flat polygonal faces, isometric view, 45-degree angle, orthographic camera, no perspective distortion, flat shading, isolated on a pure white background, clean cutout, no shadows, no background elements, centered composition, high-key lighting, sharp focus, PNG style transparent-ready render`;
+// You will receive an image generation prompt that was used to create an image, which was then converted into a 3D printable model. The prompt contains a lot of technical keywords (e.g. "isometric view", "orthographic camera", "flat shading", "PNG style"). Ignore all technical/stylistic terms and focus only on the actual subject being described.
+
+// Based on the subject, produce:
+
+// - **Title**: max 5 words, catchy and descriptive. Do NOT include technical terms like "low-poly" or "geometric" — describe the character/object in an appealing way.
+// - **Name**: a fun, memorable character name — treat the subject as if it has personality, regardless of what it is (e.g. "Maple" for a fox, "Sir Bramble" for a cactus, "Captain Peel" for a banana)
+// - **Description**: max 3 sentences. Describe the model in a way that appeals to a buyer. Mention its charm, how it looks on a desk or shelf, and who might enjoy it. Keep it warm and playful — no technical jargon.
+// - **Story**: a short, charming backstory for the character (2-4 sentences). Give it personality, a quirk or a tiny adventure.
+
+// Respond in this exact JSON format, nothing else:
+// {"title": "...", "name": "...", "description": "...", "story": "..."}
+
+// Example:
+// Prompt: "Low-polygon fox figurine, geometric faceted surfaces, minimal triangle mesh style, smooth solid matte colors, subtle pastel tones, stylized miniature sculpture, chunky simplified proportions, clean hard edges between flat polygonal faces, isometric view, 45-degree angle, orthographic camera, no perspective distortion, flat shading, isolated on a pure white background, clean cutout, no shadows, no background elements, centered composition, high-key lighting, sharp focus, PNG style transparent-ready render"
+// {"title": "Curious Woodland Fox Figure", "name": "Maple", "description": "A little fox with a big personality, sitting alert with ears perked and tail neatly curled. Its soft pastel tones and chunky proportions give it an irresistible toy-like charm. Perfect as a desk companion, shelf accent, or a gift for anyone who loves woodland creatures.", "story": "Maple once followed a falling leaf so far from home she ended up in a completely different forest. Rather than panic, she declared herself queen of it. The squirrels disagreed, but none dared say it to her face."}
+
+// Prompt: [s]
+// `;
+let s_prompt__for_generating_text_from_image = `Ignore all colors, textures, and materials entirely. Describe only the 3D shape and pose of the object in this image. What object or figure does it represent? Describe its pose in detail: the orientation of the body, head, and limbs (if any), including joint angles and the direction each part is facing. State the camera viewing angle (elevation and azimuth) relative to the object. Briefly note the overall silhouette and proportions.`
 
 
-// Group 1 — Strong silhouettes, work perfectly with base prompt
-let a_s_object__plant_group1 = [
-    "cactus",
-    "pine tree",
-    "palm tree",
-    "oak tree",
-    "succulent",
-    "bonsai tree",
-    "baobab tree",
-    "mushroom",
-    "aloe vera",
-    "lily pad",
-];
-let s_prompt__plant_group1 = `Low-polygon [s] figurine, geometric faceted surfaces, minimal triangle mesh style, smooth solid matte colors, subtle pastel green and earth tones, stylized miniature botanical sculpture, clean hard edges between flat polygonal faces, chunky simplified proportions, isometric view, 45-degree angle, orthographic camera, no perspective distortion, flat shading, isolated on a pure white background, clean cutout, no shadows, no background elements, centered composition, high-key lighting, sharp focus, PNG style transparent-ready render`;
+let s_prompt__for_generating_title_and_description_lowpoly = `
+You are a creative writer naming 3D printable low-poly figures for an online marketplace.
 
-// Group 2 — Thin or flat plants, need reinforced thickness
-let a_s_object__plant_group2 = [
-    "bamboo",
-    "fern",
-    "monstera leaf",
-    "venus flytrap",
-    "sunflower",
-];
-let s_prompt__plant_group2 = `Low-polygon [s] figurine, geometric faceted surfaces, minimal triangle mesh style, smooth solid matte colors, subtle pastel green and earth tones, stylized miniature botanical sculpture, clean hard edges between flat polygonal faces, chunky simplified proportions, thick stylized stems, bold exaggerated leaf shapes, isometric view, 45-degree angle, orthographic camera, no perspective distortion, flat shading, isolated on a pure white background, clean cutout, no shadows, no background elements, centered composition, high-key lighting, sharp focus, PNG style transparent-ready render`;
+You will receive two inputs:
+1. **Image prompt**: the text that was used to generate an image. It contains many technical keywords (e.g. "isometric view", "orthographic camera", "flat shading"). Ignore all technical/stylistic terms.
+2. **Vision description**: a description generated by a vision AI model that analyzed the resulting image. This is your most reliable source for what the model actually looks like.
 
-// Group 3 — Fine detail plants, need simplification
-let a_s_object__plant_group3 = [
-    "cherry blossom tree",
-    "willow tree",
-    "rose",
-    "tulip",
-    "lotus flower",
-];
-let s_prompt__plant_group3 = `Low-polygon [s] figurine, geometric faceted surfaces, minimal triangle mesh style, smooth solid matte colors, subtle pastel green and earth tones, stylized miniature botanical sculpture, clean hard edges between flat polygonal faces, chunky simplified proportions, simplified canopy, minimal branches, oversized bloom, exaggerated petals, isometric view, 45-degree angle, orthographic camera, no perspective distortion, flat shading, isolated on a pure white background, clean cutout, no shadows, no background elements, centered composition, high-key lighting, sharp focus, PNG style transparent-ready render`;
+Use both inputs together. The vision description tells you what the subject actually is and how it looks. The image prompt may provide additional context about intent or theme. When they conflict, trust the vision description.
 
-let a_s_object = a_s_object__plant_group3;
-let s_prompt = s_prompt__plant_group3
+Important: The final product is a 3D printable model. Most buyers will print it in a single solid color of their choice. Do NOT reference any colors, tones, palettes, or visual material finishes in your output. Focus on shape, form, pose, character, and proportions instead.
+
+Based on the subject, produce:
+
+- **Title**: max 5 words, catchy and descriptive. Do NOT include technical terms like "low-poly" or "geometric".
+- **Name**: a fun, memorable character name — treat the subject as if it has personality, regardless of what it is (e.g. "Maple" for a fox, "Sir Bramble" for a cactus, "Captain Peel" for a banana)
+- **Description**: max 3 sentences. Describe the model in a way that appeals to a buyer. Focus on its shape, pose, proportions, and charm. Mention how it looks on a desk or shelf and who might enjoy it. Keep it warm and playful — no technical jargon, no color references.
+- **Story**: a short, charming backstory for the character (2-4 sentences). Give it personality, a quirk or a tiny adventure.
+
+Respond in this exact JSON format, nothing else:
+{"title": "...", "name": "...", "description": "...", "story": "..."}
+
+Example:
+Image prompt: "Low-polygon fox figurine, geometric faceted surfaces, minimal triangle mesh style, smooth solid matte colors, subtle pastel tones, stylized miniature sculpture, chunky simplified proportions, clean hard edges between flat polygonal faces, isometric view, 45-degree angle, orthographic camera, no perspective distortion, flat shading, isolated on a pure white background"
+Vision description: "A stylized fox figurine composed of flat angular faces. The fox is sitting upright with pointed ears, a narrow snout, and a large bushy tail curled around its body. The proportions are compact and simplified, giving it a cute, chunky appearance."
+{"title": "Curious Woodland Fox Figure", "name": "Maple", "description": "A little fox with a big personality, sitting alert with ears perked and a bushy tail neatly curled around its body. Its chunky proportions and compact form give it an irresistible toy-like charm that looks great on any desk or shelf. A perfect gift for anyone who loves woodland creatures.", "story": "Maple once followed a falling leaf so far from home she ended up in a completely different forest. Rather than panic, she declared herself queen of it. The squirrels disagreed, but none dared say it to her face."}
+
+Image prompt: {s_prompt_for_image}
+Vision description: {s_prompt_for_generating_text_from_image}
+`;
+
+let s_prompt__for_generating_title_and_description = s_prompt__for_generating_title_and_description_lowpoly;
+
+
 
 export {
     s_root_dir,
@@ -115,6 +96,6 @@ export {
     s_path__venv,
     s_bin__glances,
     s_api_key__fal_ai,
-    a_s_animal,
-    s_prompt__default
+    s_prompt__for_generating_title_and_description,
+    s_prompt__for_generating_text_from_image,
 }

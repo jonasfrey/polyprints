@@ -1,5 +1,7 @@
 // Copyright (C) [2026] [Jonas Immanuel Frey] - Licensed under GPLv2. See LICENSE file for details.
 
+import { s_css_a_o_logmsg } from "./lib/handyhelpers_module.js";
+
 let s_name_prop_ts_created = 'n_ts_ms_created';
 let s_name_prop_ts_updated = 'n_ts_ms_updated';
 let s_name_prop_id = 'n_id';
@@ -83,57 +85,109 @@ let f_o_model__from_s_name_table = function(s_name_table) {
     });
 };
 
-let o_course__math101 = {
-    s_name: 'Math 101'
-}
-let o_course__cs101 = {
-    s_name: 'CS 101'
-}
-let o_student__gretel = {
-    s_name: 'Gretel',
-    o_course: o_course__cs101
-}
-let o_student__olaf = {
-    s_name: 'Olaf',
-    o_course: o_course__math101
-}
+
+
+
+
+let a_s_animal = [
+  "cat",
+  "fox",
+  "elephant",
+  "wolf",
+  "rabbit",
+  "bear",
+  "deer",
+  "owl",
+  "whale",
+  "lion",
+  "penguin",
+  "eagle",
+  "turtle",
+  "horse",
+  "dolphin",
+  "cat",
+  "rhinoceros",
+  "flamingo",
+  "gorilla",
+  "shark",
+  "frog",
+  "giraffe",
+  "octopus",
+  "koala",
+  "parrot",
+  "crocodile",
+  "chameleon",
+  "hedgehog",
+  "bull",
+  "swan",
+  "scorpion"
+];
+// let s_prompt__default = `Low-polygon animal figurine of a [s], geometric faceted surfaces, minimal triangle mesh style, smooth solid matte colors, subtle pastel tones, stylized miniature sculpture, clean hard edges between flat polygonal faces, isometric view, 45-degree angle, orthographic camera, no perspective distortion, flat shading, isolated on a pure white background, clean cutout, no shadows, no background elements, centered composition, high-key lighting, sharp focus, PNG style transparent-ready renderLow-polygon animal figurine, geometric faceted surfaces, minimal triangle mesh style, smooth solid matte colors, subtle pastel tones, stylized miniature sculpture, clean hard edges between flat polygonal faces, isometric view, 45-degree angle, orthographic camera, no perspective distortion, flat shading, isolated on a pure white background, clean cutout, no shadows, no background elements, centered composition, high-key lighting, sharp focus, PNG style transparent-ready render`
+let s_prompt__default = `Low-polygon [s] figurine, geometric faceted surfaces, minimal triangle mesh style, smooth solid matte colors, subtle pastel tones, stylized miniature sculpture, chunky simplified proportions, clean hard edges between flat polygonal faces, isometric view, 45-degree angle, orthographic camera, no perspective distortion, flat shading, isolated on a pure white background, clean cutout, no shadows, no background elements, centered composition, high-key lighting, sharp focus, PNG style transparent-ready render`;
+
+
 
 let a_o_data_default = [
-    {o_student: o_student__gretel},
-    {o_student: o_student__olaf},
     {
-        o_student: {
-            s_name: "Daria", 
-            o_course: o_course__math101
-        }
-    },
-    {
-        o_course: {
-            s_name: 'History 101', 
-            a_o_student: [
-                'Gretel',
-                'Olaf',
-                'Daria', 
-                'John'
-            ]
-        }
-    },
-    {
-        o_keyvalpair: {
-            s_key: 's_path_absolute__filebrowser',
-            s_value: '/home'
-        }
-    }, 
-    {
-        o_model__o_imagegeneratorprompt: {
-            s_prompt_template: 'a photo of a {s}',
+        o_imagegeneratorprompt: {
+            s_label: 'low polygon animal',
+            s_promptgenerator_prompt: 'generate a prompt for an image generator AI. the resulting image should be a low polygon animal. the view should be isometric',
+            s_prompt_template: `Low-polygon [s] figurine, geometric faceted surfaces, minimal triangle mesh style, smooth solid matte colors, subtle pastel tones, stylized miniature sculpture, chunky simplified proportions, clean hard edges between flat polygonal faces, isometric view, 45-degree angle, orthographic camera, no perspective distortion, flat shading, isolated on a pure white background, clean cutout, no shadows, no background elements, centered composition, high-key lighting, sharp focus, PNG style transparent-ready render`,
             a_o_imagegeneratorsubject: [
-                {s_name: 'cat'},
-                {s_name: 'dog'},
-                {s_name: 'rabbit'},
-            ]
+                "cat", "fox", "elephant", "wolf", "rabbit", "bear", "deer", "owl", "whale", "lion",
+                "penguin", "eagle", "turtle", "horse", "dolphin", "cat", "rhinoceros", "flamingo",
+                "gorilla", "shark", "frog", "giraffe", "octopus", "koala", "parrot", "crocodile",
+                "chameleon", "hedgehog", "bull", "swan", "scorpion"
+            ].map(function(s) { return { s_name: s }; }),
+        },
+    },
+    {
+        o_imagegeneratorprompt: {
+            s_label: 'low polygon plant — strong silhouettes',
+            s_promptgenerator_prompt: 'generate a prompt for an image generator AI. the resulting image should be a low polygon plant with strong silhouette. the view should be isometric',
+            s_prompt_template: `Low-polygon [s] figurine, geometric faceted surfaces, minimal triangle mesh style, smooth solid matte colors, subtle pastel green and earth tones, stylized miniature botanical sculpture, clean hard edges between flat polygonal faces, chunky simplified proportions, isometric view, 45-degree angle, orthographic camera, no perspective distortion, flat shading, isolated on a pure white background, clean cutout, no shadows, no background elements, centered composition, high-key lighting, sharp focus, PNG style transparent-ready render`,
+            a_o_imagegeneratorsubject: [
+                "cactus", "pine tree", "palm tree", "oak tree", "succulent",
+                "bonsai tree", "baobab tree", "mushroom", "aloe vera", "lily pad"
+            ].map(function(s) { return { s_name: s }; }),
+        },
+    },
+    {
+        o_imagegeneratorprompt: {
+            s_label: 'low polygon plant — thin/flat',
+            s_promptgenerator_prompt: 'generate a prompt for an image generator AI. the resulting image should be a low polygon thin or flat plant with reinforced thickness. the view should be isometric',
+            s_prompt_template: `Low-polygon [s] figurine, geometric faceted surfaces, minimal triangle mesh style, smooth solid matte colors, subtle pastel green and earth tones, stylized miniature botanical sculpture, clean hard edges between flat polygonal faces, chunky simplified proportions, thick stylized stems, bold exaggerated leaf shapes, isometric view, 45-degree angle, orthographic camera, no perspective distortion, flat shading, isolated on a pure white background, clean cutout, no shadows, no background elements, centered composition, high-key lighting, sharp focus, PNG style transparent-ready render`,
+            a_o_imagegeneratorsubject: [
+                "bamboo", "fern", "monstera leaf", "venus flytrap", "sunflower"
+            ].map(function(s) { return { s_name: s }; }),
+        },
+    },
+    {
+        o_imagegeneratorprompt: {
+            s_label: 'low polygon plant — fine detail',
+            s_promptgenerator_prompt: 'generate a prompt for an image generator AI. the resulting image should be a low polygon fine detail plant with simplified canopy. the view should be isometric',
+            s_prompt_template: `Low-polygon [s] figurine, geometric faceted surfaces, minimal triangle mesh style, smooth solid matte colors, subtle pastel green and earth tones, stylized miniature botanical sculpture, clean hard edges between flat polygonal faces, chunky simplified proportions, simplified canopy, minimal branches, oversized bloom, exaggerated petals, isometric view, 45-degree angle, orthographic camera, no perspective distortion, flat shading, isolated on a pure white background, clean cutout, no shadows, no background elements, centered composition, high-key lighting, sharp focus, PNG style transparent-ready render`,
+            a_o_imagegeneratorsubject: [
+                "cherry blossom tree", "willow tree", "rose", "tulip", "lotus flower"
+            ].map(function(s) { return { s_name: s }; }),
+        },
+    },
+    ...[
+        'thumbnail',
+        'photography',
+        'render',
+        'text_from_image',
+        'title',
+        'name',
+        'description',
+        'story'
+    ].map(s=>{
+        return {
+            o_fsnode_purpose: {
+                s_text: s,
+            }
         }
-    }
+    })
 ]
 
 
@@ -195,9 +249,7 @@ let o_model__o_fsnode = f_o_model({
         f_o_property('n_bytes', 'number'),
         f_o_property('s_name', 'string', (s)=>{return s!==''}),
         f_o_property('s_path_absolute', 'string', (s)=>{return s!==''}),
-        f_o_property('b_folder', 'boolean', (b)=>{return typeof b === 'boolean'}),
-        f_o_property('b_image', 'boolean'),
-        f_o_property('b_video', 'boolean'),
+        f_o_property('b_ai_generated', 'boolean'),
         f_o_model_prop__timestamp_default(s_name_prop_ts_created),
         f_o_model_prop__timestamp_default(s_name_prop_ts_updated),
     ]
@@ -227,6 +279,37 @@ let o_model__o_utterance = f_o_model({
     ]
 });
 
+let o_model__o_image = f_o_model({
+    s_name: 'o_image',
+    a_o_property: [
+        f_o_model_prop__default_id('n_id'),
+
+        f_o_model_prop__default_id(f_s_name_foreign_key__from_o_model(o_model__o_fsnode)),
+        f_o_model_prop__timestamp_default(s_name_prop_ts_created),
+        f_o_model_prop__timestamp_default(s_name_prop_ts_updated),
+    ]
+});
+let o_model__o_fsnode_purpose = f_o_model({
+    s_name: 'o_fsnode_purpose',
+    a_o_property: [
+        f_o_model_prop__default_id('n_id'),
+        f_o_property('s_text', 'string', (s)=>{return s!==''}),
+        f_o_model_prop__default_id(f_s_name_foreign_key__from_o_model(o_model__o_fsnode)),
+        f_o_model_prop__timestamp_default(s_name_prop_ts_created),
+        f_o_model_prop__timestamp_default(s_name_prop_ts_updated),
+    ]
+});
+let o_model__o_3dmodel = f_o_model({
+    s_name: 'o_3dmodel',
+    a_o_property: [
+        f_o_model_prop__default_id('n_id'),
+        f_o_property('s_type', 'string', (s)=>{return s!==''}), // e.g. 'gltf', 'obj', etc.
+        f_o_model_prop__default_id(f_s_name_foreign_key__from_o_model(o_model__o_fsnode)),
+        f_o_model_prop__timestamp_default(s_name_prop_ts_created),
+        f_o_model_prop__timestamp_default(s_name_prop_ts_updated),
+    ]
+});
+
 let o_model__o_imagegeneratorsubject = f_o_model({
     s_name: 'o_imagegeneratorsubject',
     a_o_property: [
@@ -241,6 +324,8 @@ let o_model__o_imagegeneratorprompt = f_o_model({
     s_name: 'o_imagegeneratorprompt',
     a_o_property: [
         f_o_model_prop__default_id('n_id'),
+        f_o_property('s_label', 'string', (s)=>{return s!==''}),
+        f_o_property('s_promptgenerator_prompt', 'string', (s)=>{return s!==''}),
         f_o_property('s_prompt_template', 'string', (s)=>{return s!==''}),
         f_o_model_prop__timestamp_default(s_name_prop_ts_created),
         f_o_model_prop__timestamp_default(s_name_prop_ts_updated),
@@ -372,7 +457,13 @@ let a_o_model = [
     o_model__o_wsclient,
     o_model__o_fsnode,
     o_model__o_keyvalpair,
-    o_model__o_utterance
+    o_model__o_utterance,
+    o_model__o_image,
+    o_model__o_3dmodel,
+    o_model__o_imagegeneratorsubject,
+    o_model__o_imagegeneratorprompt,
+    o_model__o_imagegeneratorprompt_o_imagegeneratorsubject,
+    o_model__o_fsnode_purpose,
 ];
 
 // definition factory — creates message type templates for the a_o_wsmsg registry
@@ -457,6 +548,12 @@ export {
     o_model__o_fsnode,
     o_model__o_keyvalpair,
     o_model__o_utterance,
+    o_model__o_image,
+    o_model__o_3dmodel,
+    o_model__o_imagegeneratorsubject,
+    o_model__o_imagegeneratorprompt,
+    o_model__o_imagegeneratorprompt_o_imagegeneratorsubject,
+    o_model__o_fsnode_purpose,
     a_o_model,
     f_o_property,
     f_o_model,
