@@ -21,6 +21,7 @@ import { ensureDir as f_ensure_dir } from "@std/fs";
 
 let o_db = null;
 
+
 let f_init_db = async function(s_path_db = s_path__database) {
     //make sure the folder where db should be stored exists
     await Deno.mkdir(s_path_db.slice(0, s_path_db.lastIndexOf(s_ds)), { recursive: true });
@@ -56,6 +57,30 @@ let f_init_db = async function(s_path_db = s_path__database) {
 
         let s_sql = `CREATE TABLE IF NOT EXISTS ${s_name_table} (\n${a_s_column.concat(a_s_fk).join(',\n')}\n)`;
         o_db.exec(s_sql);
+
+        // check for schema differences between JS model and existing DB table
+        let a_o_column__db = o_db.prepare(`PRAGMA table_info(${s_name_table})`).all();
+        let a_s_name_column__db = a_o_column__db.map(function(o_col) { return o_col.name; });
+        let a_s_name_column__model = o_model.a_o_property.map(function(o_prop) { return o_prop.s_name; });
+
+        // add columns that exist in JS model but not in DB
+        for (let o_prop of o_model.a_o_property) {
+            if (!a_s_name_column__db.includes(o_prop.s_name)) {
+                let s_sql_type = 'TEXT';
+                if (o_prop.s_type === 'number') s_sql_type = 'REAL';
+                if (o_prop.s_type === 'boolean') s_sql_type = 'INTEGER';
+                let s_sql_alter = `ALTER TABLE ${s_name_table} ADD COLUMN ${o_prop.s_name} ${s_sql_type}`;
+                console.log(`[f_init_db] Adding missing column '${o_prop.s_name}' to table '${s_name_table}'`);
+                o_db.exec(s_sql_alter);
+            }
+        }
+
+        // warn about columns that exist in DB but not in JS model
+        for (let s_name_column of a_s_name_column__db) {
+            if (!a_s_name_column__model.includes(s_name_column)) {
+                console.warn(`[f_init_db] WARNING: Column '${s_name_column}' exists in DB table '${s_name_table}' but is not defined in the JS model '${o_model.s_name}'`);
+            }
+        }
     }
 
     f_ensure_default_data();

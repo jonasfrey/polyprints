@@ -6,7 +6,7 @@ import {
     f_v_crud__indb,
 } from "./serverside/database_functions.js";
 import { f_a_o_fsnode, f_o_uttdatainfo__read_or_create, f_v_result_from_o_wsmsg } from "./serverside/functions.js";
-import { f_init_python, f_convert_glb_to_stl } from "./serverside/cli_functions.js";
+import { f_init_python, f_convert_glb_to_stl, f_convert_raw_to_png } from "./serverside/cli_functions.js";
 import {
     a_o_model,
     f_o_model__from_s_name_table,
@@ -34,6 +34,9 @@ import {
     s_api_key__fal_ai,
     s_prompt__for_generating_title_and_description,
     s_prompt__for_generating_text_from_image,
+    s_cults3d_username,
+    s_cults3d_api_key,
+    s_api_key__fileslink,
 } from "./serverside/runtimedata.js";
 import { s_db_create, s_db_read, s_db_update, s_db_delete } from "./localhost/runtimedata.js";
 
@@ -57,6 +60,103 @@ await f_generate_model_constructors_for_cli_languages();
 // ensure generated output directory exists
 let s_dir__generated = s_root_dir + s_ds + '.gitignored' + s_ds + 'generated';
 try { await Deno.mkdir(s_dir__generated, { recursive: true }); } catch { /* exists */ }
+
+// --- files.link helpers ---
+let s_fileslink_project_id = null;
+let s_fileslink_folder_id = null;
+
+let f_ensure_fileslink_folder = async function() {
+    if (s_fileslink_folder_id) return;
+    let o_headers = { 'Authorization': s_api_key__fileslink, 'Content-Type': 'application/json', 'accept': 'application/json' };
+
+    // find or create project
+    let o_resp_projects = await fetch('https://api.files.link/v1/projects/1', { headers: o_headers });
+    let o_projects = await o_resp_projects.json();
+    if (!o_projects.success) throw new Error('files.link list projects failed: ' + (o_projects.message || o_projects.error));
+    // API returns { projects: { projects: [...] } } (paginated)
+    let a_o_project = o_projects.projects?.projects || o_projects.projects || [];
+    if (!Array.isArray(a_o_project)) a_o_project = [];
+    let o_project = a_o_project.find(function(p) { return p.title === 'polyprints'; });
+    if (o_project) {
+        s_fileslink_project_id = o_project.id;
+    } else {
+        let o_resp = await fetch('https://api.files.link/v1/projects', { method: 'POST', headers: o_headers, body: JSON.stringify({ title: 'polyprints' }) });
+        let o_data = await o_resp.json();
+        if (!o_data.success) throw new Error('files.link create project failed: ' + (o_data.message || ''));
+        s_fileslink_project_id = o_data.projectId;
+        console.log('files.link: created project', s_fileslink_project_id);
+    }
+
+    // find or create folder
+    let o_resp_folders = await fetch('https://api.files.link/v1/folders/project/' + s_fileslink_project_id, { headers: o_headers });
+    let o_folders = await o_resp_folders.json();
+    if (!o_folders.success) throw new Error('files.link list folders failed: ' + (o_folders.message || o_folders.error));
+    // API returns { data: { folders: [...] } } or { data: [...] }
+    let a_o_folder = o_folders.data?.folders || o_folders.data || [];
+    if (!Array.isArray(a_o_folder)) a_o_folder = [];
+    let o_folder = a_o_folder.find(function(f) { return f.title === 'uploads'; });
+    if (o_folder) {
+        s_fileslink_folder_id = o_folder.id;
+    } else {
+        let o_resp = await fetch('https://api.files.link/v1/folders', { method: 'POST', headers: o_headers, body: JSON.stringify({ title: 'uploads', projectId: s_fileslink_project_id, isPrivate: false }) });
+        let o_data = await o_resp.json();
+        if (!o_data.success) throw new Error('files.link create folder failed: ' + (o_data.message || ''));
+        s_fileslink_folder_id = o_data.folderId;
+        console.log('files.link: created folder', s_fileslink_folder_id);
+    }
+};
+
+// upload bytes to files.link, create permanent link, return public URL
+let f_s_fileslink_upload = async function(a_n_byte, s_filename, s_mime_type) {
+    let o_headers = { 'Authorization': s_api_key__fileslink, 'Content-Type': 'application/json', 'accept': 'application/json' };
+    await f_ensure_fileslink_folder();
+
+    // get presigned upload URL
+    let o_resp_presign = await fetch('https://api.files.link/v1/files/' + s_fileslink_folder_id, {
+        method: 'POST',
+        headers: o_headers,
+        body: JSON.stringify({ filesMetadata: [{ name: s_filename, size: a_n_byte.length, mimeType: s_mime_type || 'application/octet-stream' }] }),
+    });
+    let o_presign = await o_resp_presign.json();
+    if (!o_presign.success || !o_presign.urls || !o_presign.urls[0]) {
+        throw new Error('files.link presign failed: ' + JSON.stringify(o_presign));
+    }
+    let s_presigned_url = o_presign.urls[0].url;
+
+    // PUT file bytes to S3
+    let o_resp_put = await fetch(s_presigned_url, {
+        method: 'PUT',
+        headers: { 'Content-Length': String(a_n_byte.length) },
+        body: a_n_byte,
+    });
+    if (!o_resp_put.ok) {
+        let s_body = await o_resp_put.text();
+        throw new Error('files.link S3 PUT failed (' + o_resp_put.status + '): ' + s_body.slice(0, 200));
+    }
+
+    // find the file ID by listing folder files
+    let o_resp_files = await fetch('https://api.files.link/v1/files/folder/' + s_fileslink_folder_id, { headers: o_headers });
+    let o_files = await o_resp_files.json();
+    if (!o_files.success) throw new Error('files.link list files failed: ' + (o_files.message || o_files.error));
+    // API returns { data: { files: [...] } } or { data: [...] }
+    let a_o_files = o_files.data?.files || o_files.data || [];
+    if (!Array.isArray(a_o_files)) a_o_files = [];
+    let o_file = a_o_files.find(function(f) { return f.fileName === s_filename; });
+    if (!o_file) throw new Error('files.link: uploaded file not found in folder listing');
+
+    // create permanent link
+    let o_resp_plink = await fetch('https://api.files.link/v1/p', {
+        method: 'POST',
+        headers: o_headers,
+        body: JSON.stringify({ fileId: o_file.id }),
+    });
+    let o_plink = await o_resp_plink.json();
+    if (!o_plink.success) throw new Error('files.link permanent link failed: ' + (o_plink.message || ''));
+
+    let s_public_url = 'https://api.files.link/v1/p/' + o_plink.link + '/' + encodeURIComponent(s_filename);
+    console.log('files.link: uploaded', s_filename, '->', s_public_url);
+    return s_public_url;
+};
 
 // read a local image file and return a base64 data URI for fal.ai
 let f_s_image_path_to_data_uri = async function(s_path) {
@@ -606,6 +706,40 @@ let f_handler = async function(o_request, o_conninfo) {
         }
     }
 
+    // convert RAW images to PNG in a folder
+    if (s_path === '/api/convert-raw-to-png' && o_request.method === 'POST') {
+        try {
+            let o_body = await o_request.json();
+            let s_path_folder = o_body.s_path_folder;
+            if (!s_path_folder) return new Response(JSON.stringify({ s_error: 'missing s_path_folder' }), { status: 400, headers: { 'content-type': 'application/json' } });
+            let f_on_progress = function(s_message) {
+                let s_msg = JSON.stringify(
+                    f_o_wsmsg(
+                        o_wsmsg__logmsg.s_name,
+                        f_o_logmsg(
+                            s_message,
+                            true,
+                            true,
+                            s_o_logmsg_s_type__info,
+                            Date.now(),
+                            5000
+                        )
+                    )
+                );
+                for (let o_sock of a_o_socket) {
+                    if (o_sock.readyState === WebSocket.OPEN) {
+                        o_sock.send(s_msg);
+                    }
+                }
+            };
+            let o_result = await f_convert_raw_to_png(s_path_folder, f_on_progress);
+            return new Response(JSON.stringify(o_result), { headers: { 'content-type': 'application/json' } });
+        } catch (o_error) {
+            console.error('convert-raw-to-png error:', o_error.message);
+            return new Response(JSON.stringify({ s_error: o_error.message }), { status: 500, headers: { 'content-type': 'application/json' } });
+        }
+    }
+
     // generate text_from_image via VLM (fal-ai/bagel/understand)
     if (s_path === '/api/generate-text-from-image' && o_request.method === 'POST') {
         try {
@@ -745,6 +879,212 @@ let f_handler = async function(o_request, o_conninfo) {
             return new Response(JSON.stringify({ s_title, s_name, s_description, s_story, a_o_created }), { headers: { 'content-type': 'application/json' } });
         } catch (o_error) {
             console.error('generate-text error:', o_error.message);
+            return new Response(JSON.stringify({ s_error: o_error.message }), { status: 500, headers: { 'content-type': 'application/json' } });
+        }
+    }
+
+    // upload files to files.link and return permanent public URLs
+    if (s_path === '/api/fileslink-upload' && o_request.method === 'POST') {
+        try {
+            if (!s_api_key__fileslink) {
+                return new Response(JSON.stringify({ s_error: 'Files.link API key not configured. Set S_API_KEY_FILESLINK in .env' }), { status: 400, headers: { 'content-type': 'application/json' } });
+            }
+
+            let o_body = await o_request.json();
+            let a_s_path = o_body.a_s_path || [];
+            if (!a_s_path.length) {
+                return new Response(JSON.stringify({ s_error: 'No file paths provided' }), { status: 400, headers: { 'content-type': 'application/json' } });
+            }
+
+            let a_o_result = [];
+            for (let s_file_path of a_s_path) {
+                try {
+                    let a_n_byte = await Deno.readFile(s_file_path);
+                    let s_filename = s_file_path.split(s_ds).pop();
+                    // deduplicate filename with timestamp
+                    let s_ext = s_filename.includes('.') ? '.' + s_filename.split('.').pop() : '';
+                    let s_base = s_ext ? s_filename.slice(0, -s_ext.length) : s_filename;
+                    let s_unique_name = s_base + '_' + Date.now() + s_ext;
+                    // guess mime type
+                    let s_mime = 'application/octet-stream';
+                    let s_lower = s_filename.toLowerCase();
+                    if (s_lower.endsWith('.png')) s_mime = 'image/png';
+                    else if (s_lower.endsWith('.jpg') || s_lower.endsWith('.jpeg')) s_mime = 'image/jpeg';
+                    else if (s_lower.endsWith('.webp')) s_mime = 'image/webp';
+                    else if (s_lower.endsWith('.stl')) s_mime = 'model/stl';
+                    else if (s_lower.endsWith('.glb')) s_mime = 'model/gltf-binary';
+                    else if (s_lower.endsWith('.3mf')) s_mime = 'application/vnd.ms-package.3dmanufacturing-3dmodel+xml';
+                    else if (s_lower.endsWith('.txt')) s_mime = 'text/plain';
+
+                    let s_url = await f_s_fileslink_upload(a_n_byte, s_unique_name, s_mime);
+                    a_o_result.push({ s_path: s_file_path, s_filename: s_filename, s_url: s_url });
+                } catch (o_err) {
+                    console.error('files.link upload failed for', s_file_path, ':', o_err.message);
+                    a_o_result.push({ s_path: s_file_path, s_filename: s_file_path.split(s_ds).pop(), s_error: o_err.message });
+                }
+            }
+
+            return new Response(JSON.stringify({ success: true, a_o_result: a_o_result }), { headers: { 'content-type': 'application/json' } });
+        } catch (o_error) {
+            console.error('fileslink-upload error:', o_error.message);
+            return new Response(JSON.stringify({ s_error: o_error.message }), { status: 500, headers: { 'content-type': 'application/json' } });
+        }
+    }
+
+    // upload to Cults3D via GraphQL API
+    if (s_path === '/api/cults3d-upload' && o_request.method === 'POST') {
+        try {
+            if (!s_cults3d_username || !s_cults3d_api_key) {
+                return new Response(JSON.stringify({ s_error: 'Cults3D credentials not configured. Set S_CULTS3D_USERNAME and S_CULTS3D_API_KEY in .env' }), { status: 400, headers: { 'content-type': 'application/json' } });
+            }
+
+            let o_form = await o_request.formData();
+            let s_name = o_form.get('s_name') || '';
+            let s_description = o_form.get('s_description') || '';
+            let s_tags = o_form.get('s_tags') || '';
+            let s_path_thumbnail = o_form.get('s_path_thumbnail') || '';
+            let s_path_stl = o_form.get('s_path_stl') || '';
+            let o_file_3mf = o_form.get('o_file_3mf');
+            let n_o_fsnode_n_id = o_form.get('n_o_fsnode_n_id');
+            if (n_o_fsnode_n_id) n_o_fsnode_n_id = Number(n_o_fsnode_n_id);
+
+            // upload files to files.link for public URLs
+            let a_s_image_url = [];
+            let a_s_file_url = [];
+
+            // upload thumbnail if provided
+            if (s_path_thumbnail) {
+                let a_n_byte = await Deno.readFile(s_path_thumbnail);
+                let s_filename = s_path_thumbnail.split(s_ds).pop();
+                let s_unique = s_filename.replace(/(\.\w+)$/, '_' + Date.now() + '$1');
+                let s_url = await f_s_fileslink_upload(a_n_byte, s_unique, 'image/png');
+                a_s_image_url.push(s_url);
+                console.log('cults3d: thumbnail uploaded to', s_url);
+            }
+
+            // upload STL if provided
+            if (s_path_stl) {
+                let a_n_byte = await Deno.readFile(s_path_stl);
+                let s_filename = s_path_stl.split(s_ds).pop();
+                let s_unique = s_filename.replace(/(\.\w+)$/, '_' + Date.now() + '$1');
+                let s_url = await f_s_fileslink_upload(a_n_byte, s_unique, 'model/stl');
+                a_s_file_url.push(s_url);
+                console.log('cults3d: STL uploaded to', s_url);
+            }
+
+            // upload .3mf if provided (from form data)
+            if (o_file_3mf && o_file_3mf instanceof File) {
+                let a_n_byte = new Uint8Array(await o_file_3mf.arrayBuffer());
+                let s_unique = o_file_3mf.name.replace(/(\.\w+)$/, '_' + Date.now() + '$1');
+                let s_url = await f_s_fileslink_upload(a_n_byte, s_unique, 'application/vnd.ms-package.3dmanufacturing-3dmodel+xml');
+                a_s_file_url.push(s_url);
+                console.log('cults3d: 3MF uploaded to', s_url);
+            }
+
+            // call Cults3D GraphQL createCreation mutation
+            let s_auth = btoa(s_cults3d_username + ':' + s_cults3d_api_key);
+
+            let s_query = `mutation CreateCreation(
+                $name: String!
+                $description: String!
+                $imageUrls: [String!]!
+                $fileUrls: [String!]!
+                $categoryId: ID!
+                $subCategoryIds: [ID!]
+                $downloadPrice: Float!
+                $currency: CurrencyEnum!
+                $licenseCode: String
+                $locale: LocaleEnum!
+            ) {
+                createCreation(
+                    name: $name
+                    description: $description
+                    imageUrls: $imageUrls
+                    fileUrls: $fileUrls
+                    categoryId: $categoryId
+                    subCategoryIds: $subCategoryIds
+                    downloadPrice: $downloadPrice
+                    currency: $currency
+                    licenseCode: $licenseCode
+                    locale: $locale
+                ) {
+                    creation { id url(locale: EN) }
+                    errors
+                }
+            }`;
+
+            let o_variables = {
+                name: s_name,
+                description: s_description,
+                imageUrls: a_s_image_url,
+                fileUrls: a_s_file_url,
+                categoryId: 'Q2F0ZWdvcnkvMjM=',
+                subCategoryIds: [],
+                downloadPrice: 0,
+                currency: 'EUR',
+                licenseCode: 'cc_by',
+                locale: 'EN',
+            };
+
+            console.log('cults3d: calling createCreation for', s_name);
+            let o_resp_gql = await fetch('https://cults3d.com/graphql', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'Authorization': 'Basic ' + s_auth,
+                },
+                body: JSON.stringify({ query: s_query, variables: o_variables }),
+            });
+
+            let o_gql_result = await o_resp_gql.json();
+            console.log('cults3d: API response:', JSON.stringify(o_gql_result).slice(0, 500));
+
+            if (o_gql_result.errors || o_gql_result.data?.createCreation?.errors?.length) {
+                let s_err = JSON.stringify(o_gql_result.errors || o_gql_result.data.createCreation.errors);
+                throw new Error('Cults3D API error: ' + s_err);
+            }
+
+            let o_creation = o_gql_result.data?.createCreation?.creation;
+
+            // save cults3d.txt alongside the model files
+            let s_cults_info = JSON.stringify({
+                s_cults3d_id: o_creation?.id,
+                s_cults3d_url: o_creation?.url,
+                s_cults3d_name: o_creation?.name,
+                n_ts_ms_uploaded: Date.now(),
+                s_name: s_name,
+            }, null, 2);
+
+            let s_sanitized = s_name.replace(/[^a-zA-Z0-9]/g, '_').slice(0, 60);
+            let s_filename_cults = s_sanitized + '_cults3d_' + Date.now() + '.txt';
+            let s_path_cults = s_dir__generated + s_ds + s_filename_cults;
+            let a_n_byte = new TextEncoder().encode(s_cults_info);
+            await Deno.writeFile(s_path_cults, a_n_byte);
+            console.log('cults3d: info saved to', s_path_cults);
+
+            // create fsnode + purpose for tracking
+            let o_fsnode_data = {
+                n_bytes: a_n_byte.length,
+                s_name: s_filename_cults,
+                s_path_absolute: s_path_cults,
+                b_ai_generated: false,
+            };
+            if (n_o_fsnode_n_id) o_fsnode_data.n_o_fsnode_n_id = n_o_fsnode_n_id;
+            let o_fsnode = f_v_crud__indb(s_db_create, 'a_o_fsnode', o_fsnode_data);
+            f_v_crud__indb(s_db_create, 'a_o_fsnode_purpose', {
+                s_text: 'cults3d',
+                n_o_fsnode_n_id: o_fsnode.n_id,
+            });
+            f_broadcast_db_data('a_o_fsnode');
+            f_broadcast_db_data('a_o_fsnode_purpose');
+
+            return new Response(JSON.stringify({
+                o_creation: o_creation,
+                o_fsnode: o_fsnode,
+            }), { headers: { 'content-type': 'application/json' } });
+
+        } catch (o_error) {
+            console.error('cults3d-upload error:', o_error.message);
             return new Response(JSON.stringify({ s_error: o_error.message }), { status: 500, headers: { 'content-type': 'application/json' } });
         }
     }

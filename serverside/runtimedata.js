@@ -26,6 +26,9 @@ let s_path__venv = Deno.env.get('PATH_VENV') ?? './venv';
 let s_bin__glances = Deno.env.get('BIN_GLANCES') ?? 'glances';
 
 let s_api_key__fal_ai = Deno.env.get('S_API_KEY_FAL_AI') ?? '';
+let s_cults3d_username = Deno.env.get('S_CULTS3D_USERNAME') ?? '';
+let s_cults3d_api_key = Deno.env.get('S_CULTS3D_API_KEY') ?? '';
+let s_api_key__fileslink = Deno.env.get('S_API_KEY_FILESLINK') ?? '';
 
 // let s_prompt__for_generating_title_and_description_lowpoly = `You are a creative writer naming 3D printable low-poly figures for an online marketplace.
 
@@ -98,4 +101,7 @@ export {
     s_api_key__fal_ai,
     s_prompt__for_generating_title_and_description,
     s_prompt__for_generating_text_from_image,
+    s_cults3d_username,
+    s_cults3d_api_key,
+    s_api_key__fileslink,
 }

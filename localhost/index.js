@@ -23,6 +23,8 @@ import { o_component__data } from './o_component__data.js';
 import { o_component__filebrowser } from './o_component__filebrowser.js';
 import { o_component__generatedata } from './o_component__generatedata.js';
 import { o_component__generateprompts } from './o_component__generateprompts.js';
+import { o_component__results } from './o_component__results.js';
+import { o_component__photography } from './o_component__photography.js';
 import './css_helper.js';
 
 import { o_logmsg__run_command } from "./runtimedata.js";
@@ -55,6 +57,16 @@ let o_state = reactive({
             path: '/generateprompts',
             name: 'generateprompts',
             component: markRaw(o_component__generateprompts),
+        },
+        {
+            path: '/results',
+            name: 'results',
+            component: markRaw(o_component__results),
+        },
+        {
+            path: '/photography',
+            name: 'photography',
+            component: markRaw(o_component__photography),
         },
     ],
     a_o_model,

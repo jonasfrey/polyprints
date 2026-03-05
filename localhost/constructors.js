@@ -172,6 +172,16 @@ let a_o_data_default = [
             ].map(function(s) { return { s_name: s }; }),
         },
     },
+    {
+        o_imagegeneratorprompt: {
+            s_label: 'low polygon mythical creature',
+            s_promptgenerator_prompt: 'generate a prompt for an image generator AI. the resulting image should be a low polygon mythical fantasy creature with chunky proportions and bold features. the view should be isometric',
+            s_prompt_template: `Low-polygon [s] figurine, geometric faceted surfaces, minimal triangle mesh style, smooth solid matte colors, subtle pastel fantasy tones, stylized miniature fantasy sculpture, clean hard edges between flat polygonal faces, chunky simplified proportions, bold exaggerated features, compact sturdy pose, isometric view, 45-degree angle, orthographic camera, no perspective distortion, flat shading, isolated on a pure white background, clean cutout, no shadows, no background elements, centered composition, high-key lighting, sharp focus, PNG style transparent-ready render`,
+            a_o_imagegeneratorsubject: [
+                "baby dragon", "unicorn", "phoenix", "griffin", "cerberus", "pegasus", "hydra", "minotaur", "kraken", "chimera"
+            ].map(function(s) { return { s_name: s }; }),
+        },
+    },
     ...[
         'thumbnail',
         'photography',
@@ -180,7 +190,8 @@ let a_o_data_default = [
         'title',
         'name',
         'description',
-        'story'
+        'story',
+        'cults3d'
     ].map(s=>{
         return {
             o_fsnode_purpose: {
@@ -283,8 +294,14 @@ let o_model__o_image = f_o_model({
     s_name: 'o_image',
     a_o_property: [
         f_o_model_prop__default_id('n_id'),
-
         f_o_model_prop__default_id(f_s_name_foreign_key__from_o_model(o_model__o_fsnode)),
+
+        f_o_property('n_scl_x', 'number'),
+        f_o_property('n_scl_y', 'number'),
+        f_o_property('n_scl_x_crop', 'number'),
+        f_o_property('n_scl_y_crop', 'number'),
+         f_o_property('n_trn_x_crop', 'number'),
+        f_o_property('n_trn_y_crop', 'number'),       
         f_o_model_prop__timestamp_default(s_name_prop_ts_created),
         f_o_model_prop__timestamp_default(s_name_prop_ts_updated),
     ]
@@ -341,6 +358,23 @@ let o_model__o_imagegeneratorprompt_o_imagegeneratorsubject = f_o_model({
         f_o_model_prop__timestamp_default(s_name_prop_ts_updated),
     ]
 }); 
+let o_model__o_generation_process = f_o_model({
+    s_name: 'o_generation_process',
+    a_o_property: [
+        f_o_model_prop__default_id('n_id'),
+    ]
+}); 
+
+let o_model__o_generation_step = f_o_model({
+    s_name: 'o_generation_step',
+    a_o_property: [
+        f_o_model_prop__default_id('n_id'),
+        f_o_model_prop__default_id(f_s_name_foreign_key__from_o_model(o_model__o_generation_process)),
+        f_o_property('s_description', 'string', (s)=>{return s!==''}),
+        f_o_model_prop__timestamp_default(s_name_prop_ts_created),
+        f_o_model_prop__timestamp_default(s_name_prop_ts_updated),
+    ]
+});
 
 let f_o_example_instance_connected_cricular_from_o_model = function(o_model, a_s_name__visited = []){
     let o = {};
@@ -490,7 +524,6 @@ let f_o_wsmsg = function(
         s_uuid: crypto.randomUUID()
     }
 }
-
 // message type definitions
 let o_wsmsg__deno_copy_file = f_o_wsmsg_def('deno_copy_file', false);
 let o_wsmsg__deno_stat = f_o_wsmsg_def('deno_stat', false);

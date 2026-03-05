@@ -98,6 +98,42 @@ let o_component__generatedata = {
                     },
                 ],
             },
+            // prompt preview tiles — shown when a preset is selected and words are entered
+            {
+                s_tag: 'div',
+                class: 'o_generatedata__prompt_tiles',
+                'v-if': 's_prompt && s_words && !b_generating',
+                a_o: [
+                    {
+                        s_tag: 'label',
+                        class: 'o_generatedata__prompt_tiles_label',
+                        innerText: 'Prompts',
+                    },
+                    {
+                        s_tag: 'div',
+                        class: 'o_generatedata__prompt_tiles_grid',
+                        a_o: [
+                            {
+                                s_tag: 'div',
+                                'v-for': 's_word in a_s_word_parsed',
+                                class: 'o_generatedata__prompt_tile',
+                                a_o: [
+                                    {
+                                        s_tag: 'div',
+                                        class: 'o_generatedata__prompt_tile_word',
+                                        innerText: '{{ s_word }}',
+                                    },
+                                    {
+                                        s_tag: 'div',
+                                        class: 'o_generatedata__prompt_tile_text',
+                                        innerText: "{{ s_prompt.replace(/\\[s\\]/g, s_word) }}",
+                                    },
+                                ],
+                            },
+                        ],
+                    },
+                ],
+            },
             {
                 s_tag: 'div',
                 class: 'o_generatedata__results',
@@ -365,9 +401,16 @@ let o_component__generatedata = {
             b_generating: false,
             s_status: '',
             a_o_result: [],
+            n_done: 0,
         };
     },
     computed: {
+        a_s_word_parsed: function() {
+            return this.s_words
+                .split(',')
+                .map(function(s) { return s.trim(); })
+                .filter(function(s) { return s !== ''; });
+        },
         a_s_purpose_available: function() {
             // collect distinct purpose texts from o_fsnode_purpose records that have no fsnode linked (the label definitions)
             let a_o_purpose = o_state.a_o_fsnode_purpose || [];
@@ -696,11 +739,12 @@ let o_component__generatedata = {
             }
 
             o_self.b_generating = true;
+            o_self.n_done = 0;
+            o_self.s_status = 'Generating ' + a_s_word.length + ' subjects in parallel...';
 
-            for (let n_idx = 0; n_idx < a_s_word.length; n_idx++) {
-                let s_word = a_s_word[n_idx];
+            // create all result objects upfront
+            let a_o_task = a_s_word.map(function(s_word) {
                 let s_prompt_resolved = o_self.s_prompt.replace(/\[s\]/g, s_word);
-
                 let o_result = {
                     s_word: s_word,
                     s_prompt_resolved: s_prompt_resolved,
@@ -722,106 +766,118 @@ let o_component__generatedata = {
                     s_error: null,
                 };
                 o_self.a_o_result.push(o_result);
-                let s_folder_name = o_self.f_s_sanitize_word(s_word) + '_' + Date.now();
-                o_self.s_status = 'Generating image ' + (n_idx + 1) + '/' + a_s_word.length + ': ' + s_word;
+                return { s_word: s_word, s_prompt_resolved: s_prompt_resolved, o_result: o_result };
+            });
 
-                // 1. generate image
-                try {
-                    let o_resp = await fetch('/api/generate-image', {
-                        method: 'POST',
-                        headers: { 'Content-Type': 'application/json' },
-                        body: JSON.stringify({ s_prompt: s_prompt_resolved, s_word: s_word, s_folder_name: s_folder_name }),
-                    });
-                    let o_data = await o_resp.json();
-                    if (o_data.s_error) throw new Error(o_data.s_error);
-                    o_result.s_path_image = o_data.s_path_image;
-                    o_result.s_url_image = o_data.s_url_image;
-                    o_result.n_id_fsnode_image = o_data.n_id_fsnode;
-                } catch (o_error) {
-                    o_result.s_error = 'Image generation failed: ' + o_error.message;
-                    o_result.s_status = 'error';
-                    continue;
-                }
-
-                // 2. generate text_from_image via VLM
-                o_result.s_status = 'generating_text_from_image';
-                o_result.b_generating_text_from_image = true;
-                o_self.s_status = 'Generating text from image ' + (n_idx + 1) + '/' + a_s_word.length + ': ' + s_word;
-                try {
-                    let o_resp_vlm = await fetch('/api/generate-text-from-image', {
-                        method: 'POST',
-                        headers: { 'Content-Type': 'application/json' },
-                        body: JSON.stringify({
-                            s_path_image: o_result.s_path_image,
-                            s_word: s_word,
-                            n_o_fsnode_n_id: o_result.n_id_fsnode_image,
-                            s_folder_name: s_folder_name,
-                        }),
-                    });
-                    let o_data_vlm = await o_resp_vlm.json();
-                    if (o_data_vlm.s_error) throw new Error(o_data_vlm.s_error);
-                    o_result.s_text_from_image = o_data_vlm.s_text_from_image;
-                } catch (o_error) {
-                    o_result.s_error = 'Text from image generation failed: ' + o_error.message;
-                    o_result.b_generating_text_from_image = false;
-                    o_result.s_status = 'error';
-                    continue;
-                }
-                o_result.b_generating_text_from_image = false;
-
-                // 3. generate title, name, description, story text files via LLM
-                o_result.s_status = 'generating_text';
-                o_result.b_generating_text = true;
-                o_self.s_status = 'Generating text ' + (n_idx + 1) + '/' + a_s_word.length + ': ' + s_word;
-                try {
-                    let o_resp_text = await fetch('/api/generate-text', {
-                        method: 'POST',
-                        headers: { 'Content-Type': 'application/json' },
-                        body: JSON.stringify({
-                            s_prompt_original: s_prompt_resolved,
-                            s_text_from_image: o_result.s_text_from_image,
-                            s_word: s_word,
-                            n_o_fsnode_n_id: o_result.n_id_fsnode_image,
-                            s_folder_name: s_folder_name,
-                        }),
-                    });
-                    let o_data_text = await o_resp_text.json();
-                    if (o_data_text.s_error) throw new Error(o_data_text.s_error);
-                    o_result.s_title = o_data_text.s_title;
-                    o_result.s_name = o_data_text.s_name;
-                    o_result.s_description = o_data_text.s_description;
-                    o_result.s_story = o_data_text.s_story;
-                } catch (o_error) {
-                    o_result.s_error = 'Text generation failed: ' + o_error.message;
-                }
-                o_result.b_generating_text = false;
-
-                // 4. generate 3D model
-                o_result.s_status = 'generating_model';
-                o_self.s_status = 'Generating 3D model ' + (n_idx + 1) + '/' + a_s_word.length + ': ' + s_word;
-
-                try {
-                    let o_resp = await fetch('/api/generate-model', {
-                        method: 'POST',
-                        headers: { 'Content-Type': 'application/json' },
-                        body: JSON.stringify({ s_path_image: o_result.s_path_image, s_word: s_word, s_folder_name: s_folder_name }),
-                    });
-                    let o_data = await o_resp.json();
-                    if (o_data.s_error) throw new Error(o_data.s_error);
-                    o_result.s_path_model = o_data.s_path_model;
-                    o_result.n_id_fsnode_model = o_data.n_id_fsnode;
-                } catch (o_error) {
-                    o_result.s_error = '3D model generation failed: ' + o_error.message;
-                    o_result.s_status = 'error';
-                    continue;
-                }
-
-                o_result.s_status = 'done';
-                o_self.f_convert_stl(o_result);
-            }
+            // run all generation chains in parallel
+            await Promise.all(a_o_task.map(function(o_task) {
+                return o_self.f_generate_one(o_task.s_word, o_task.s_prompt_resolved, o_task.o_result, a_s_word.length);
+            }));
 
             o_self.b_generating = false;
             o_self.s_status = 'Done!';
+        },
+        f_generate_one: async function(s_word, s_prompt_resolved, o_result, n_total) {
+            let o_self = this;
+            let s_folder_name = o_self.f_s_sanitize_word(s_word) + '_' + Date.now();
+
+            // 1. generate image
+            try {
+                let o_resp = await fetch('/api/generate-image', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ s_prompt: s_prompt_resolved, s_word: s_word, s_folder_name: s_folder_name }),
+                });
+                let o_data = await o_resp.json();
+                if (o_data.s_error) throw new Error(o_data.s_error);
+                o_result.s_path_image = o_data.s_path_image;
+                o_result.s_url_image = o_data.s_url_image;
+                o_result.n_id_fsnode_image = o_data.n_id_fsnode;
+            } catch (o_error) {
+                o_result.s_error = 'Image generation failed: ' + o_error.message;
+                o_result.s_status = 'error';
+                o_self.n_done++;
+                o_self.s_status = o_self.n_done + '/' + n_total + ' done';
+                return;
+            }
+
+            // 2. generate text_from_image via VLM
+            o_result.s_status = 'generating_text_from_image';
+            o_result.b_generating_text_from_image = true;
+            try {
+                let o_resp_vlm = await fetch('/api/generate-text-from-image', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        s_path_image: o_result.s_path_image,
+                        s_word: s_word,
+                        n_o_fsnode_n_id: o_result.n_id_fsnode_image,
+                        s_folder_name: s_folder_name,
+                    }),
+                });
+                let o_data_vlm = await o_resp_vlm.json();
+                if (o_data_vlm.s_error) throw new Error(o_data_vlm.s_error);
+                o_result.s_text_from_image = o_data_vlm.s_text_from_image;
+            } catch (o_error) {
+                o_result.s_error = 'Text from image generation failed: ' + o_error.message;
+                o_result.b_generating_text_from_image = false;
+                o_result.s_status = 'error';
+                o_self.n_done++;
+                o_self.s_status = o_self.n_done + '/' + n_total + ' done';
+                return;
+            }
+            o_result.b_generating_text_from_image = false;
+
+            // 3. generate title, name, description, story text files via LLM
+            o_result.s_status = 'generating_text';
+            o_result.b_generating_text = true;
+            try {
+                let o_resp_text = await fetch('/api/generate-text', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        s_prompt_original: s_prompt_resolved,
+                        s_text_from_image: o_result.s_text_from_image,
+                        s_word: s_word,
+                        n_o_fsnode_n_id: o_result.n_id_fsnode_image,
+                        s_folder_name: s_folder_name,
+                    }),
+                });
+                let o_data_text = await o_resp_text.json();
+                if (o_data_text.s_error) throw new Error(o_data_text.s_error);
+                o_result.s_title = o_data_text.s_title;
+                o_result.s_name = o_data_text.s_name;
+                o_result.s_description = o_data_text.s_description;
+                o_result.s_story = o_data_text.s_story;
+            } catch (o_error) {
+                o_result.s_error = 'Text generation failed: ' + o_error.message;
+            }
+            o_result.b_generating_text = false;
+
+            // 4. generate 3D model
+            o_result.s_status = 'generating_model';
+            try {
+                let o_resp = await fetch('/api/generate-model', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ s_path_image: o_result.s_path_image, s_word: s_word, s_folder_name: s_folder_name }),
+                });
+                let o_data = await o_resp.json();
+                if (o_data.s_error) throw new Error(o_data.s_error);
+                o_result.s_path_model = o_data.s_path_model;
+                o_result.n_id_fsnode_model = o_data.n_id_fsnode;
+            } catch (o_error) {
+                o_result.s_error = '3D model generation failed: ' + o_error.message;
+                o_result.s_status = 'error';
+                o_self.n_done++;
+                o_self.s_status = o_self.n_done + '/' + n_total + ' done';
+                return;
+            }
+
+            o_result.s_status = 'done';
+            o_self.n_done++;
+            o_self.s_status = o_self.n_done + '/' + n_total + ' done';
+            o_self.f_convert_stl(o_result);
         },
     },
 };

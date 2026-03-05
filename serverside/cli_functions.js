@@ -252,9 +252,56 @@ let f_create_thumbnail_from_stl = async function(s_path_stl){
 
 }
 
+let a_s_raw_ext = ['.arw', '.cr2', '.cr3', '.nef', '.dng', '.orf', '.rw2', '.raf', '.srw', '.pef'];
+
+let f_convert_raw_to_png = async function(s_path_folder, f_on_progress) {
+    let a_s_converted = [];
+    let a_s_error = [];
+    // collect raw files first so we know the total count
+    let a_o_raw = [];
+    for await (let o_entry of Deno.readDir(s_path_folder)) {
+        if (o_entry.isDirectory) continue;
+        let s_ext = o_entry.name.slice(o_entry.name.lastIndexOf('.')).toLowerCase();
+        if (!a_s_raw_ext.includes(s_ext)) continue;
+        a_o_raw.push(o_entry);
+    }
+    let n_total = a_o_raw.length;
+    if (f_on_progress) f_on_progress('found ' + n_total + ' raw files in ' + s_path_folder);
+    for (let n_i = 0; n_i < a_o_raw.length; n_i++) {
+        let o_entry = a_o_raw[n_i];
+        let s_path_raw = s_path_folder + s_ds + o_entry.name;
+        let s_path_png = s_path_raw.slice(0, s_path_raw.lastIndexOf('.')) + '.png';
+        if (f_on_progress) f_on_progress('converting ' + (n_i + 1) + '/' + n_total + ': ' + o_entry.name);
+        try {
+            let o_proc = new Deno.Command('bash', {
+                args: ['-c', `dcraw -c -w -a "${s_path_raw}" | convert - -auto-level -sigmoidal-contrast 3,50% "${s_path_png}"`],
+                stdout: 'piped',
+                stderr: 'piped',
+            });
+            let o_output = await o_proc.output();
+            if (o_output.code !== 0) {
+                let s_stderr = new TextDecoder().decode(o_output.stderr);
+                console.error('raw-to-png failed for ' + o_entry.name + ':', s_stderr);
+                a_s_error.push(o_entry.name + ': ' + s_stderr);
+                if (f_on_progress) f_on_progress('failed: ' + o_entry.name);
+                continue;
+            }
+            console.log('converted to PNG:', s_path_png);
+            a_s_converted.push(s_path_png);
+        } catch (o_err) {
+            console.error('raw-to-png exception for ' + o_entry.name + ':', o_err.message);
+            a_s_error.push(o_entry.name + ': ' + o_err.message);
+            if (f_on_progress) f_on_progress('error: ' + o_entry.name + ' - ' + o_err.message);
+        }
+    }
+    if (f_on_progress) f_on_progress('done: ' + a_s_converted.length + ' converted, ' + a_s_error.length + ' failed');
+    return { a_s_converted, a_s_error };
+};
+
 export {
     f_init_python,
     f_o_uttdatainfo,
     f_install_linux_binary,
     f_convert_glb_to_stl,
+    f_convert_raw_to_png,
 };

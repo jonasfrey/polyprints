@@ -29,14 +29,11 @@ let f_a_o_fsnode = async function(
         for await (let o_dir_entry of Deno.readDir(s_path)) {
             let s_path_absolute = `${s_path}${s_ds}${o_dir_entry.name}`;
 
-            let o_fsnode = f_o_model_instance(
-                o_model__o_fsnode,
-                {
+            let o_fsnode = {
                     s_path_absolute,
                     s_name: s_path_absolute.split(s_ds).at(-1),
                     b_folder: o_dir_entry.isDirectory,
-                }
-            );
+                };
             if(b_store_in_db){
                 let o_fsnode__fromdb = (f_v_crud__indb(s_db_read, f_s_name_table__from_o_model(o_model__o_fsnode), { s_path_absolute }))?.at(0);
                 if (o_fsnode__fromdb) {

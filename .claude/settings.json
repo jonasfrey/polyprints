@@ -1,0 +1,24 @@
+{
+  "permissions": {
+    "allow": [
+      "WebSearch",
+      "WebFetch(domain:github.com)",
+      "WebFetch(domain:cults3d.com)",
+      "WebFetch(domain:raw.githubusercontent.com)",
+      "WebFetch(domain:api.files.link)",
+      "Bash(curl -s https://api.files.link/api-docs/)",
+      "Bash(curl -s https://api.files.link/api-docs/swagger-ui-init.js)",
+      "Bash(curl -s -X POST 'https://api.files.link/v1/projects' -H 'accept: application/json' -H 'Authorization: a0d782a4-1035-4c43-a4c0-17c72b550bdf' -H 'Content-Type: application/json' -d '{\"\"title\"\": \"\"polyprints\"\"}')",
+      "Bash(curl -s -X POST 'https://api.files.link/v1/folders' -H 'accept: application/json' -H 'Authorization: a0d782a4-1035-4c43-a4c0-17c72b550bdf' -H 'Content-Type: application/json' -d '{\"\"title\"\": \"\"uploads\"\", \"\"projectId\"\": \"\"dff5c9a0-5724-485e-9b9f-c4a92e178bf2\"\", \"\"isPrivate\"\": false}')",
+      "Bash(curl -s -X POST 'https://api.files.link/v1/files/a3820bbc-2897-4722-9bcd-2af940ca81ce' -H 'accept: application/json' -H 'Authorization: a0d782a4-1035-4c43-a4c0-17c72b550bdf' -H 'Content-Type: application/json' -d '{\"\"filesMetadata\"\": [{\"\"name\"\": \"\"test.txt\"\", \"\"size\"\": 11, \"\"mimeType\"\": \"\"text/plain\"\"}]}')",
+      "Bash(curl -s -X PUT --data-binary @- -H 'Content-Length: 11' 'https://files-link.s3.us-east-1.amazonaws.com/bc81c2b9-8b1c-4900-8706-71abaf08736b/a3820bbc-2897-4722-9bcd-2af940ca81ce/test.txt?X-Amz-Algorithm=AWS4-HMAC-SHA256&X-Amz-Content-Sha256=UNSIGNED-PAYLOAD&X-Amz-Credential=AKIA3RA4AMKUZYJYC7V4%2F20260305%2Fus-east-1%2Fs3%2Faws4_request&X-Amz-Date=20260305T145106Z&X-Amz-Expires=600&X-Amz-Signature=57b601a6625ea2c06e2efb5e5f26e528ff305503ae1423409ca38b33b10667ae&X-Amz-SignedHeaders=content-length%3Bhost&x-amz-checksum-crc32=AAAAAA%3D%3D&x-amz-sdk-checksum-algorithm=CRC32&x-amz-storage-class=STANDARD&x-id=PutObject')",
+      "Bash(curl -s 'https://api.files.link/v1/files/folder/a3820bbc-2897-4722-9bcd-2af940ca81ce' -H 'Authorization: a0d782a4-1035-4c43-a4c0-17c72b550bdf')",
+      "Bash(curl -s 'https://api.files.link/v1/projects/1' -H 'Authorization: a0d782a4-1035-4c43-a4c0-17c72b550bdf')",
+      "Bash(python3 -m json.tool)",
+      "Bash(curl -s -X POST 'https://api.files.link/v1/projects' -H 'Authorization: a0d782a4-1035-4c43-a4c0-17c72b550bdf' -H 'Content-Type: application/json' -d '{\"\"title\"\": \"\"polyprints\"\"}')",
+      "Bash(curl -s -X POST 'https://api.files.link/v1/folders' -H 'Authorization: a0d782a4-1035-4c43-a4c0-17c72b550bdf' -H 'Content-Type: application/json' -d '{\"\"title\"\":\"\"uploads\"\",\"\"projectId\"\":\"\"9833ec42-88ef-464a-99a1-77210fad0217\"\",\"\"isPrivate\"\":false}')",
+      "Bash(curl -s -X POST \"https://api.files.link/v1/files/fd5b7caa-cd02-4763-a2a6-9d00ef8a7a88\" -H 'Authorization: a0d782a4-1035-4c43-a4c0-17c72b550bdf' -H 'Content-Type: application/json' -d '{\"\"filesMetadata\"\":[{\"\"name\"\":\"\"test_1741190000.txt\"\",\"\"size\"\":11,\"\"mimeType\"\":\"\"text/plain\"\"}]}')",
+      "Bash(curl -s -o /dev/null -w \"%{http_code}\" -X PUT --data-binary @- -H 'Content-Length: 11' 'https://files-link.s3.us-east-1.amazonaws.com/bc81c2b9-8b1c-4900-8706-71abaf08736b/fd5b7caa-cd02-4763-a2a6-9d00ef8a7a88/test_1741190000.txt?X-Amz-Algorithm=AWS4-HMAC-SHA256&X-Amz-Content-Sha256=UNSIGNED-PAYLOAD&X-Amz-Credential=AKIA3RA4AMKUZYJYC7V4%2F20260305%2Fus-east-1%2Fs3%2Faws4_request&X-Amz-Date=20260305T150651Z&X-Amz-Expires=600&X-Amz-Signature=f9561b4b4677244b1b2495e628ed71691b368c49799928f6f6fe5aee6d27e055&X-Amz-SignedHeaders=content-length%3Bhost&x-amz-checksum-crc32=AAAAAA%3D%3D&x-amz-sdk-checksum-algorithm=CRC32&x-amz-storage-class=STANDARD&x-id=PutObject')"
+    ]
+  }
+}
