@@ -1,0 +1,156 @@
+{
+  "name": "real_photography_to_marketplace_content",
+  "title": "Real Photography to Marketplace Content",
+  "contents": {
+    "name": "workflow",
+    "nodes": {
+      "output": {
+        "type": "display",
+        "id": "output",
+        "depends": ["node-composite", "node-title-desc", "node-upscale"],
+        "fields": {
+          "thumbnail": "$node-upscale.images",
+          "composite_draft": "$node-composite.images",
+          "listing_text": "$node-title-desc.output"
+        },
+        "input": {},
+        "metadata": {
+          "position": { "x": 5200, "y": 0 }
+        }
+      },
+
+      "node-describe": {
+        "type": "run",
+        "id": "node-describe",
+        "depends": ["input"],
+        "app": "openrouter/router/vision",
+        "input": {
+          "image_urls": ["$input.image_url"],
+          "prompt": "Describe the visual appearance of the most prominent object in this image in precise, objective terms. Focus only on what is directly observable:\n\n1. Object identity: what the object appears to be (e.g. figurine, vase, tool, toy)\n2. Shape & form: overall silhouette, proportions, and pose or orientation\n3. Surface & texture: visible surface details, layer lines, material qualities (smooth, rough, matte, glossy, faceted)\n4. Color: dominant colors, color distribution, gradients, or notable contrast areas\n5. Details: distinguishing features such as facial features, limbs, accessories, decorative elements, or text\n6. Style: visual style (low-poly, realistic, stylized, abstract, miniature) based on geometry and rendering\n7. Approximate size: estimate relative to surroundings if possible\n\nDo not use evaluative or emotional language. Do not infer meaning, symbolism, or intent. Only describe what is visually present.",
+          "model": "anthropic/claude-opus-4"
+        },
+        "metadata": {
+          "position": { "x": 400, "y": -100 }
+        }
+      },
+
+      "node-remove-bg": {
+        "type": "run",
+        "id": "node-remove-bg",
+        "depends": ["input"],
+        "app": "fal-ai/birefnet",
+        "input": {
+          "image_url": "$input.image_url"
+        },
+        "metadata": {
+          "position": { "x": 400, "y": 300 }
+        }
+      },
+
+      "node-title-desc": {
+        "type": "run",
+        "id": "node-title-desc",
+        "depends": ["node-describe"],
+        "app": "openrouter/router",
+        "input": {
+          "system_prompt": "You are a marketplace listing copywriter for 3D printable models. Given a description of a 3D printed object, create a compelling listing.\n\nFormat your response exactly as:\n\ntitle: (3 words max, catchy and descriptive)\n\ndescription: (2 sentences about what the object is and its key visual features)\n\nstory: (1 sentence explaining a use case — why someone would want to 3D print this model)",
+          "model": "anthropic/claude-sonnet-4.6",
+          "prompt": "$node-describe.output"
+        },
+        "metadata": {
+          "position": { "x": 1200, "y": -300 }
+        }
+      },
+
+      "node-scene-prompt": {
+        "type": "run",
+        "id": "node-scene-prompt",
+        "depends": ["node-describe"],
+        "app": "openrouter/router",
+        "input": {
+          "model": "openai/gpt-4.1",
+          "system_prompt": "You are a product photography director. Given a description of a small 3D printed object (~30mm), create a prompt for an AI image generator to produce a close-up lifestyle/mood shot.\n\nRules:\n- This is a MACRO / CLOSE-UP shot. The camera is very close to the object. The white sphere placeholder should fill roughly 30-40% of the frame.\n- Choose an environment that thematically fits the object (e.g. a dragon figurine → dimly lit fantasy shelf with old books; a fish → coastal rocks with ocean spray; a geometric vase → modern minimalist interior)\n- The scene must include a white sphere placed prominently in the center of the composition, filling a large portion of the frame. This sphere is a placeholder that will be replaced with the actual product image later.\n- Frame the shot as if photographing a small collectible or miniature — tight crop, intimate perspective, eye-level or slightly above\n- Very shallow depth of field — only the sphere and its immediate surroundings are in focus, background is bokeh\n- Describe ONLY the setting and atmosphere — do NOT describe the product itself\n- The background should complement but not compete with the product — keep it minimal and clean\n- Lighting should be warm and professional, as in commercial macro product photography\n- Output ONLY the image generation prompt, nothing else",
+          "prompt": "$node-describe.output"
+        },
+        "metadata": {
+          "position": { "x": 1200, "y": 300 }
+        }
+      },
+
+      "node-generate-scene": {
+        "type": "run",
+        "id": "node-generate-scene",
+        "depends": ["node-scene-prompt"],
+        "app": "fal-ai/flux-pro/v1.1",
+        "input": {
+          "prompt": "$node-scene-prompt.output",
+          "image_size": "landscape_16_9",
+          "num_images": 1
+        },
+        "metadata": {
+          "position": { "x": 2200, "y": 300 }
+        }
+      },
+
+      "node-composite": {
+        "type": "run",
+        "id": "node-composite",
+        "depends": ["node-generate-scene", "node-remove-bg", "node-describe"],
+        "app": "fal-ai/flux-pro/v1.1/redux",
+        "input": {
+          "image_urls": [
+            "$node-generate-scene.images.0.url",
+            "$node-remove-bg.image.url"
+          ],
+          "prompt": "Product photography composite. Take the scene and naturally place the product object where the white sphere placeholder is. The product should look naturally integrated into the scene with matching lighting, shadows, and perspective. Keep the product as the clear focal point. Professional marketplace thumbnail quality."
+        },
+        "metadata": {
+          "position": { "x": 3200, "y": 100 }
+        }
+      },
+
+      "node-upscale": {
+        "type": "run",
+        "id": "node-upscale",
+        "depends": ["node-composite"],
+        "app": "fal-ai/clarity-upscaler",
+        "input": {
+          "image_url": "$node-composite.images.0.url",
+          "prompt": "professional product photography, sharp details, commercial quality",
+          "creativity": 0.2,
+          "scale_factor": 2
+        },
+        "metadata": {
+          "position": { "x": 4200, "y": 100 }
+        }
+      }
+    },
+    "output": {
+      "thumbnail": "$node-upscale.images",
+      "composite_draft": "$node-composite.images",
+      "listing_text": "$node-title-desc.output"
+    },
+    "schema": {
+      "input": {
+        "image_url": {
+          "name": "image_url",
+          "label": "Product Photo URL",
+          "description": "URL of the product photo taken in your studio",
+          "required": true,
+          "defaultValue": "",
+          "examples": [],
+          "ui": {},
+          "type": "string"
+        }
+      },
+      "output": {}
+    },
+    "version": "1",
+    "metadata": {
+      "input": {
+        "position": { "x": -400, "y": 0 }
+      }
+    }
+  },
+  "is_public": false
+}
